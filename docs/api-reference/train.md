@@ -187,9 +187,3 @@ The `train` function implements the following training pipeline:
    - Evaluates on the train, validation, and test sets
 
 The function utilizes a unique early stopping approach that is more robust to temporary fluctuations in validation loss, making it particularly suitable for graph learning where such fluctuations are common.
-
-## Related Components
-
-- [train_one_epoch]({% link api-reference/train-one-epoch.md %}): Function for training a single epoch
-- [train_selective]({% link api-reference/train-selective.md %}): Similar function for training SelectiveGCN models
-- [evaluate_metrics]({% link api-reference/metrics.md %}): Function used for performance evaluation
