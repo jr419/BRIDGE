@@ -1,0 +1,30 @@
+# BRIDGE sensitivity analysis configuration for single graph experiment
+
+# Experiment metadata
+experiment_name: single_graph_experiment
+experiment_type: sensitivity
+
+# Graph parameters
+num_nodes: 3000
+num_classes: 4
+homophily: 0.8
+mean_degree: 20
+
+# Feature parameters
+feature_dim: 5
+cov_scale: 1.0e-4
+intra_class_cov: 0.1
+inter_class_cov: -0.05
+global_cov: 1.0
+noise_cov: 1.0
+
+# Model parameters
+model_type: two_layer_gcn  # Options: linear_gcn, two_layer_gcn
+hidden_dim: 32
+learning_rate: 0.01
+weight_decay: 1.0e-3
+num_epochs: 200
+
+# Experiment settings
+num_acc_repeats: 10         # Number of training repetitions for accuracy estimation
+num_monte_carlo_samples: 50  # Number of samples for Monte Carlo SNR estimation

@@ -1,0 +1,38 @@
+# BRIDGE configuration for synthetic datasets test experiment
+
+# General settings
+seed : 42
+device : cuda
+num_trials : 3
+experiment_name : synthetic_experiment
+
+# Model settings
+do_hp: false
+do_self_loop: true
+do_residual: false
+early_stopping: 50
+
+# Dataset settings
+dataset_type : synthetic
+syn_nodes : 3000
+syn_classes : 4
+syn_homophily : 0.5
+syn_degree : 25
+syn_features : 5
+
+# Optimization parameters
+gcn_h_feats: [16, 32, 64, 128]
+gcn_n_layers: [1, 2, 3]
+gcn_dropout_range: [0.0, 0.7]
+temperature_range: [1.0e-5, 2.0]
+p_add_range: [0.0, 1.0]
+p_remove_range: [0.0, 1.0]
+h_feats_selective_options: [16, 32, 64, 128]
+n_layers_selective_options: [1, 2, 3]
+dropout_selective_range: [0.0, 0.7]
+lr_selective_range: [1.0e-4, 1.0e-1]
+wd_selective_range: [1.0e-6, 1.0e-3]
+
+
+# Symmetry checking
+check_symmetry: false
