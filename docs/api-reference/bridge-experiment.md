@@ -182,4 +182,3 @@ The function is particularly useful for:
 ## Related Components
 
 - [run_bridge_pipeline]({% link api-reference/bridge-pipeline.md %}): The core pipeline function that this function wraps
-- [compute_confidence_interval]({% link api-reference/matrix-utils.md %}): Function used to compute confidence intervals

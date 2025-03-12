@@ -195,8 +195,3 @@ The rewiring process balances several objectives:
 - Moving toward the optimal class-based connectivity structure
 - Preserving some aspects of the original graph
 - Introducing stochasticity to avoid overfitting
-
-## Related Components
-
-- [run_bridge_pipeline]({% link api-reference/bridge-pipeline.md %}): Uses this function as part of the complete rewiring pipeline
-- [local_homophily]({% link api-reference/local-homophily.md %}): Used to evaluate the quality of the rewired graph
