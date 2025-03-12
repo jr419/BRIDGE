@@ -45,4 +45,3 @@ The `training` package provides functions for training and evaluating graph neur
 
 - [train]({% link api-reference/train.md %}): Train a GNN with early stopping
 - [train_selective]({% link api-reference/train-selective.md %}): Train a selective GNN on multiple graph versions
-
