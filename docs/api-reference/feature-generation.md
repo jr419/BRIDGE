@@ -313,8 +313,4 @@ The feature generation model directly corresponds to the SNR theoretical framewo
   - Higher intra-class vs. inter-class covariance → Higher SNR
   - Lower global and node-specific covariance → Higher SNR
 
-## Related Components
 
-- [estimate_snr_monte_carlo]({% link api-reference/snr.md %}): Uses feature generators for SNR estimation
-- [run_sensitivity_experiment]({% link api-reference/sensitivity-analysis.md %}): Comprehensive experiment using feature generators
-- [SyntheticGraphDataset]({% link api-reference/synthetic-dataset.md %}): Uses similar feature generation methodology for datasets

@@ -486,10 +486,3 @@ Sensitivity analysis provides insights into:
 3. **Architecture Selection**: Whether to use standard or high-pass filters based on graph properties
 4. **Optimal Graph Structure**: What structures maximize signal-to-noise ratio
 
-## Related Components
-
-- [estimate_snr_monte_carlo]({% link api-reference/snr.md %}): Monte Carlo SNR estimation
-- [estimate_snr_theorem]({% link api-reference/snr.md %}): Theorem-based SNR estimation
-- [create_feature_generator]({% link api-reference/feature-generation.md %}): Creation of feature generators with controlled covariance
-- [LinearGCN]({% link api-reference/snr.md %}): Linear GCN model for analytical sensitivity analysis
-- [SyntheticGraphDataset]({% link api-reference/synthetic-dataset.md %}): Dataset for controlled sensitivity experiments

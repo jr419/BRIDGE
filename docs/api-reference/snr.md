@@ -330,10 +330,3 @@ print(f"Monte Carlo SNR: {snr_mc.item():.4f}")
 print(f"Theorem-based SNR: {snr_theorem.item():.4f}")
 print(f"Test Accuracy: {test_acc:.4f}")
 ```
-
-## Related Components
-
-- [estimate_sensitivity_analytic]({% link api-reference/sensitivity-analysis.md %}): Function for computing model sensitivities analytically
-- [estimate_sensitivity_autograd]({% link api-reference/sensitivity-analysis.md %}): Function for computing model sensitivities using autograd
-- [run_sensitivity_experiment]({% link api-reference/sensitivity-analysis.md %}): High-level experiment function that uses SNR estimation
-- [create_feature_generator]({% link api-reference/feature-generation.md %}): Function for creating feature generators with specified covariance structure
