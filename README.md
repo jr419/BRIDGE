@@ -5,6 +5,8 @@ BRIDGE (Block Rewiring from Inference-Derived Graph Ensembles) is a novel graph 
 > **The Limits of MPNNs: How Homophilic Bottlenecks Restrict the Signal-to-Noise Ratio in Message Passing**  
 > *Jonathan Rubin, Sahil Loomba, Nick S. Jones*
 
+**[📚 Documentation](https://jr419.github.io/BRIDGE/)**
+
 ## Repository Structure
 
 This repository contains two main packages:
