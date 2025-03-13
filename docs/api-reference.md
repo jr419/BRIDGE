@@ -50,7 +50,6 @@ The `training` package provides functions for training and evaluating graph neur
 
 The `utils` package includes utility functions for working with graphs and matrices.
 
-- [homophily]({% link api-reference/homophily.md %}): Compute homophily metrics for a graph
 - [local_homophily]({% link api-reference/local-homophily.md %}): Compute local homophily for each node
 - [matrix_utils]({% link api-reference/matrix-utils.md %}): Utilities for working with matrices
 - [graph_utils]({% link api-reference/graph-utils.md %}): Utilities for working with graphs
