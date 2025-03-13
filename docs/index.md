@@ -11,7 +11,7 @@ permalink: /
 A novel graph rewiring technique that leverages Stochastic Block Models (SBMs) to create optimized graph structures for improved node classification.
 {: .fs-6 .fw-300 }
 
-[Get Started]({% link getting-started.md %}){: .btn .btn-primary .fs-5 .mb-4 .mb-md-0 .mr-2 }
+[Get Started](/BRIDGE/docs/getting-started.md)
 [View on GitHub](https://github.com/jr419/BRIDGE){: .btn .fs-5 .mb-4 .mb-md-0 }
 
 ---
