@@ -45,3 +45,26 @@ The `training` package provides functions for training and evaluating graph neur
 
 - [train]({% link api-reference/train.md %}): Train a GNN with early stopping
 - [train_selective]({% link api-reference/train-selective.md %}): Train a selective GNN on multiple graph versions
+
+### bridge.utils
+
+The `utils` package includes utility functions for working with graphs and matrices.
+
+- [homophily]({% link api-reference/homophily.md %}): Compute homophily metrics for a graph
+- [local_homophily]({% link api-reference/local-homophily.md %}): Compute local homophily for each node
+- [matrix_utils]({% link api-reference/matrix-utils.md %}): Utilities for working with matrices
+- [graph_utils]({% link api-reference/graph-utils.md %}): Utilities for working with graphs
+
+### bridge.datasets
+
+The `datasets` package provides functionality for creating and working with graph datasets.
+
+- [SyntheticGraphDataset]({% link api-reference/synthetic-dataset.md %}): Generate synthetic graphs with controllable properties
+
+### bridge.sensitivity
+
+The `sensitivity` package offers tools for sensitivity and SNR analysis of graph neural networks.
+
+- [SNR Estimation]({% link api-reference/snr.md %}): Estimate the SNR of GNN outputs
+- [Sensitivity Analysis]({% link api-reference/sensitivity-analysis.md %}): Compute sensitivity measures for GNNs
+- [Feature Generation]({% link api-reference/feature-generation.md %}): Generate features with controlled covariance structure
