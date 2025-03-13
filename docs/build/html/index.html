@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="./">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>BRIDGE: Block Rewiring from Inference-Derived Graph Ensembles &#8212; BRIDGE 1.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=4f649999" />
+    <link rel="stylesheet" type="text/css" href="_static/alabaster.css?v=039e1c02" />
+    <script src="_static/documentation_options.js?v=f2a433a1"></script>
+    <script src="_static/doctools.js?v=888ff710"></script>
+    <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Getting Started" href="getting-started.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="bridge-block-rewiring-from-inference-derived-graph-ensembles">
+<h1>BRIDGE: Block Rewiring from Inference-Derived Graph Ensembles<a class="headerlink" href="#bridge-block-rewiring-from-inference-derived-graph-ensembles" title="Link to this heading">¶</a></h1>
+<p>A novel graph rewiring technique that leverages Stochastic Block Models (SBMs) to create optimized graph structures for improved node classification.</p>
+<a class="reference external image-reference" href="https://opensource.org/licenses/MIT"><img alt="MIT License" src="https://img.shields.io/badge/License-MIT-blue.svg" /></a>
+<p>The BRIDGE (Block Rewiring from Inference-Derived Graph Ensembles) library implements the methods and experiments described in:</p>
+<blockquote>
+<div><p><strong>The Limits of MPNNs: How Homophilic Bottlenecks Restrict the Signal-to-Noise Ratio in Message Passing</strong>
+<em>Jonathan Rubin, Sahil Loomba, Nick S. Jones</em></p>
+</div></blockquote>
+<section id="repository-structure">
+<h2>Repository Structure<a class="headerlink" href="#repository-structure" title="Link to this heading">¶</a></h2>
+<p>This repository contains two main packages:</p>
+<ol class="arabic simple">
+<li><p><strong>BRIDGE Rewiring Package</strong> - The core implementation of the BRIDGE technique for graph rewiring to optimize the performance of graph neural networks.</p></li>
+<li><p><strong>Sensitivity Analysis Package</strong> - Tools for analyzing the signal-to-noise ratio and sensitivity of graph neural networks, which were used to derive the theoretical results in the paper.</p></li>
+</ol>
+</section>
+<section id="key-concepts-from-the-paper">
+<h2>Key Concepts from the Paper<a class="headerlink" href="#key-concepts-from-the-paper" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p><strong>Signal-to-Noise Ratio (SNR) Framework</strong>: A novel approach to quantify MPNN performance through signal, noise, and global sensitivity metrics</p></li>
+<li><p><strong>Higher-Order Homophily</strong>: Measures of multi-hop connectivity between same-class nodes that bound MPNN sensitivity</p></li>
+<li><p><strong>Homophilic Bottlenecks</strong>: Network structures that restrict information flow between nodes of the same class</p></li>
+<li><p><strong>Optimal Graph Structures</strong>: Characterization of graph structures that maximize performance for given class assignments</p></li>
+<li><p><strong>Graph Rewiring</strong>: Techniques to modify graph topology to increase higher-order homophily</p></li>
+</ul>
+</section>
+<section id="features">
+<h2>Features<a class="headerlink" href="#features" title="Link to this heading">¶</a></h2>
+<p><strong>Graph Rewiring</strong></p>
+<ul class="simple">
+<li><p>SBM-based graph rewiring to optimize network structure</p></li>
+<li><p>Support for both homophilic and heterophilic settings</p></li>
+<li><p>Selective GNN models that choose the best graph structure for each node</p></li>
+</ul>
+<p><strong>GNN Models</strong></p>
+<ul class="simple">
+<li><p>Graph Convolutional Networks (GCN) with various configurations</p></li>
+<li><p>High/Low-Pass graph convolution filter models</p></li>
+<li><p>Selective GNN models that can choose the best graph structure for each node</p></li>
+</ul>
+<p><strong>Sensitivity Analysis</strong></p>
+<ul class="simple">
+<li><p>Signal, noise, and global sensitivity estimation</p></li>
+<li><p>SNR calculation using both Monte Carlo and analytical methods</p></li>
+<li><p>Node-level analysis of homophilic bottlenecks</p></li>
+</ul>
+<p><strong>Optimization &amp; Experiments</strong></p>
+<ul class="simple">
+<li><p>Hyperparameter optimization with Optuna</p></li>
+<li><p>Support for standard graph datasets and synthetic graph generation</p></li>
+<li><p>Comprehensive evaluation metrics and visualization tools</p></li>
+</ul>
+<div class="toctree-wrapper compound">
+<p class="caption" role="heading"><span class="caption-text">Documentation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="getting-started.html">Getting Started</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="getting-started.html#installation">Installation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="getting-started.html#quick-start-example">Quick Start Example</a></li>
+<li class="toctree-l2"><a class="reference internal" href="getting-started.html#sensitivity-analysis-example">Sensitivity Analysis Example</a></li>
+<li class="toctree-l2"><a class="reference internal" href="getting-started.html#command-line-interface">Command-Line Interface</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="theory.html">Theoretical Framework</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="theory.html#signal-to-noise-ratio-framework">Signal-to-Noise Ratio Framework</a></li>
+<li class="toctree-l2"><a class="reference internal" href="theory.html#higher-order-homophily">Higher-Order Homophily</a></li>
+<li class="toctree-l2"><a class="reference internal" href="theory.html#homophilic-bottlenecks">Homophilic Bottlenecks</a></li>
+<li class="toctree-l2"><a class="reference internal" href="theory.html#optimal-graph-structures">Optimal Graph Structures</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="rewiring/index.html">Graph Rewiring</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="rewiring/index.html#overview">Overview</a></li>
+<li class="toctree-l2"><a class="reference internal" href="rewiring/index.html#homophily-masked-message-passing">Homophily-Masked Message Passing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="rewiring/index.html#graph-rewiring-parameters">Graph Rewiring Parameters</a></li>
+<li class="toctree-l2"><a class="reference internal" href="rewiring/index.html#example-usage">Example Usage</a></li>
+</ul>
+</li>
+</ul>
+</div>
+<div class="toctree-wrapper compound">
+</div>
+<div class="toctree-wrapper compound">
+</div>
+</section>
+<section id="citation">
+<h2>Citation<a class="headerlink" href="#citation" title="Link to this heading">¶</a></h2>
+<p>If you use this library in your research, please cite:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>@article{rubin2025limits,
+  author = {Jonathan Rubin, Sahil Loomba, Nick S. Jones},
+  title = {The Limits of MPNNs: How Homophilic Bottlenecks Restrict the Signal-to-Noise Ratio in Message Passing},
+  year = {2025},
+  journal = {},
+  url = {https://github.com/jr419/BRIDGE}
+}
+</pre></div>
+</div>
+</section>
+<section id="license">
+<h2>License<a class="headerlink" href="#license" title="Link to this heading">¶</a></h2>
+<p>This project is licensed under the MIT License - see the LICENSE file for details.</p>
+</section>
+</section>
+<section id="indices-and-tables">
+<h1>Indices and tables<a class="headerlink" href="#indices-and-tables" title="Link to this heading">¶</a></h1>
+<ul class="simple">
+<li><p><a class="reference internal" href="genindex.html"><span class="std std-ref">Index</span></a></p></li>
+<li><p><a class="reference internal" href="py-modindex.html"><span class="std std-ref">Module Index</span></a></p></li>
+<li><p><a class="reference internal" href="search.html"><span class="std std-ref">Search Page</span></a></p></li>
+</ul>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="#">BRIDGE</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<p class="caption" role="heading"><span class="caption-text">Documentation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="getting-started.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="theory.html">Theoretical Framework</a></li>
+<li class="toctree-l1"><a class="reference internal" href="rewiring/index.html">Graph Rewiring</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="#">Documentation overview</a><ul>
+      <li>Next: <a href="getting-started.html" title="next chapter">Getting Started</a></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2025, JONATHAN.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 7.2.6</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.13</a>
+      
+      |
+      <a href="_sources/index.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

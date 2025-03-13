@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="./">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Theoretical Framework &#8212; BRIDGE 1.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=4f649999" />
+    <link rel="stylesheet" type="text/css" href="_static/alabaster.css?v=039e1c02" />
+    <script src="_static/documentation_options.js?v=f2a433a1"></script>
+    <script src="_static/doctools.js?v=888ff710"></script>
+    <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Graph Rewiring" href="rewiring/index.html" />
+    <link rel="prev" title="Getting Started" href="getting-started.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="theoretical-framework">
+<h1>Theoretical Framework<a class="headerlink" href="#theoretical-framework" title="Link to this heading">¶</a></h1>
+<section id="signal-to-noise-ratio-framework">
+<h2>Signal-to-Noise Ratio Framework<a class="headerlink" href="#signal-to-noise-ratio-framework" title="Link to this heading">¶</a></h2>
+<p>The core of our theoretical framework is the Signal-to-Noise Ratio (SNR) analysis of Message Passing Neural Networks (MPNNs). This approach allows us to quantify how effectively an MPNN can separate different node classes based on the underlying graph structure.</p>
+<section id="feature-decomposition">
+<h3>Feature Decomposition<a class="headerlink" href="#feature-decomposition" title="Link to this heading">¶</a></h3>
+<p>We model the distribution of node features in relation to their class labels using a decomposition into signal and noise components:</p>
+<div class="math notranslate nohighlight">
+\[X_j = \mu_{y_j} + \gamma + \epsilon_j\]</div>
+<p>where:</p>
+<ul class="simple">
+<li><p><span class="math notranslate nohighlight">\(\mu_{y_j}\)</span> represents the class-specific signal for class <span class="math notranslate nohighlight">\(y_j\)</span></p></li>
+<li><p><span class="math notranslate nohighlight">\(\gamma\)</span> is a global shift vector shared across all nodes (with zero mean)</p></li>
+<li><p><span class="math notranslate nohighlight">\(\epsilon_j\)</span> is node-specific IID noise (with zero mean)</p></li>
+</ul>
+</section>
+<section id="signal-to-noise-ratio">
+<h3>Signal-to-Noise Ratio<a class="headerlink" href="#signal-to-noise-ratio" title="Link to this heading">¶</a></h3>
+<p>For an <span class="math notranslate nohighlight">\(\ell\)</span>-layer MPNN, we define the SNR as:</p>
+<div class="math notranslate nohighlight">
+\[\text{SNR}(H^{(\ell)}_{ip}) := \frac{\text{Var}_\mu[\mathbb{E}[H^{(\ell)}_{ip} | \mu]]}{\mathbb{E}_\mu[\text{Var}[H^{(\ell)}_{ip} | \mu]]}\]</div>
+<p>This measures the ratio of variance explained by class-specific signals to the unexplained variance, quantifying how well the model separates different classes.</p>
+</section>
+<section id="sensitivity-measures">
+<h3>Sensitivity Measures<a class="headerlink" href="#sensitivity-measures" title="Link to this heading">¶</a></h3>
+<p>We introduce three key metrics to analyze MPNN behavior:</p>
+<ol class="arabic">
+<li><p><strong>Signal Sensitivity</strong>: Measures the model’s response to coherent class-specific changes in the input features</p>
+<div class="math notranslate nohighlight">
+\[S^{(\ell)}_{i,p,q,r} := \sum_{j,k \in V} \frac{\partial H^{(\ell)}_{ip}}{\partial X_{jq}} \frac{\partial H^{(\ell)}_{ip}}{\partial X_{kr}} \delta_{y_j,y_k}\]</div>
+</li>
+<li><p><strong>Noise Sensitivity</strong>: Measures the model’s response to unstructured, IID noise</p>
+<div class="math notranslate nohighlight">
+\[N^{(\ell)}_{i,p,q,r} := \sum_{j \in V} \frac{\partial H^{(\ell)}_{ip}}{\partial X_{jq}} \frac{\partial H^{(\ell)}_{ip}}{\partial X_{jr}}\]</div>
+</li>
+<li><p><strong>Global Sensitivity</strong>: Measures the model’s response to global shifts in the input</p>
+<div class="math notranslate nohighlight">
+\[T^{(\ell)}_{i,p,q,r} := \sum_{j,k \in V} \frac{\partial H^{(\ell)}_{ip}}{\partial X_{jq}} \frac{\partial H^{(\ell)}_{ip}}{\partial X_{kr}}\]</div>
+</li>
+</ol>
+</section>
+<section id="snr-sensitivity-relation">
+<h3>SNR-Sensitivity Relation<a class="headerlink" href="#snr-sensitivity-relation" title="Link to this heading">¶</a></h3>
+<p>Our main theoretical result relates the SNR to the sensitivity measures:</p>
+<div class="math notranslate nohighlight">
+\[\text{SNR}(H^{(\ell)}_{ip}) \approx \frac{\sum_{q,r=1}^{d_{out}}(\Sigma^{(intra)}_{qr} - \Sigma^{(inter)}_{qr})S^{(\ell)}_{i,p,q,r} + \sum_{q,r=1}^{d_{out}}\Sigma^{(inter)}_{qr}T^{(\ell)}_{i,p,q,r}}{\sum_{q,r=1}^{d_{out}}\Phi_{qr}T^{(\ell)}_{i,p,q,r} + \sum_{q,r=1}^{d_{out}}\Psi_{qr}N^{(\ell)}_{i,p,q,r}}\]</div>
+<p>where <span class="math notranslate nohighlight">\(\Sigma^{(intra)}\)</span>, <span class="math notranslate nohighlight">\(\Sigma^{(inter)}\)</span>, <span class="math notranslate nohighlight">\(\Phi\)</span>, and <span class="math notranslate nohighlight">\(\Psi\)</span> are the covariance matrices of intra-class signals, inter-class signals, global shifts, and node noise, respectively.</p>
+</section>
+</section>
+<section id="higher-order-homophily">
+<h2>Higher-Order Homophily<a class="headerlink" href="#higher-order-homophily" title="Link to this heading">¶</a></h2>
+<section id="definition">
+<h3>Definition<a class="headerlink" href="#definition" title="Link to this heading">¶</a></h3>
+<p>We introduce higher-order homophily as a generalization of standard homophily measures. For a graph shift operator <span class="math notranslate nohighlight">\(\hat{A}\)</span>, the <span class="math notranslate nohighlight">\(r\)</span>-order homophily is defined as:</p>
+<div class="math notranslate nohighlight">
+\[h_r(\hat{A}) := \frac{1}{n}\sum_{i,j \in V} [\hat{A}^r]_{ij} \delta_{y_i,y_j}\]</div>
+<p>Similarly, we define <span class="math notranslate nohighlight">\(r\)</span>-order self-connectivity <span class="math notranslate nohighlight">\(\eta_r(\hat{A})\)</span> and total connectivity <span class="math notranslate nohighlight">\(\tau_r(\hat{A})\)</span>.</p>
+</section>
+<section id="sensitivity-bounds">
+<h3>Sensitivity Bounds<a class="headerlink" href="#sensitivity-bounds" title="Link to this heading">¶</a></h3>
+<p>Our analysis shows that the signal sensitivity of an MPNN is bounded by higher-order homophily. For an isotropic MPNN with bounded message and update functions, we prove:</p>
+<div class="math notranslate nohighlight">
+\[S^{(\ell)}_{i,p,q,r} \leq \sum_{s,t=0}^{\ell} \binom{\ell}{s}\binom{\ell}{t} \alpha_1^{2\ell-s-t}(\alpha_2\beta)^{s+t} h^{s,t}_i(\hat{A})\]</div>
+<p>where <span class="math notranslate nohighlight">\(h^{s,t}_i(\hat{A})\)</span> is the local <span class="math notranslate nohighlight">\((s,t)\)</span>-order homophily at node <span class="math notranslate nohighlight">\(i\)</span>. This bound reveals that higher-order homophily fundamentally limits the ability of MPNNs to leverage class-specific signals.</p>
+</section>
+</section>
+<section id="homophilic-bottlenecks">
+<h2>Homophilic Bottlenecks<a class="headerlink" href="#homophilic-bottlenecks" title="Link to this heading">¶</a></h2>
+<section id="id1">
+<h3>Definition<a class="headerlink" href="#id1" title="Link to this heading">¶</a></h3>
+<p>Homophilic bottlenecks are nodes with low local homophily, which restrict the flow of class-specific information through the network. Unlike general bottlenecks, which impede all information flow, homophilic bottlenecks specifically impact nodes from the same class.</p>
+</section>
+<section id="underreaching-and-oversquashing">
+<h3>Underreaching and Oversquashing<a class="headerlink" href="#underreaching-and-oversquashing" title="Link to this heading">¶</a></h3>
+<p>We decompose the effects of homophilic bottlenecks into two distinct phenomena:</p>
+<ol class="arabic simple">
+<li><p><strong>Underreaching</strong>: The failure of information to propagate between distant nodes of the same class</p></li>
+<li><p><strong>Oversquashing</strong>: The interference and compression of information from multiple source nodes as it converges at a target node</p></li>
+</ol>
+<p>We formalize this decomposition for sparse graph ensembles as:</p>
+<div class="math notranslate nohighlight">
+\[\mathbb{E}[\hat{A}^{\ell}_{ij}] = \sum_{r=1}^{\ell} \mathbb{E}[\hat{A}^{\ell}_{ij} | \lambda_{ij} = r] \cdot P(\lambda_{ij} = r)\]</div>
+<p>where <span class="math notranslate nohighlight">\(\lambda_{ij}\)</span> is the shortest path length between nodes <span class="math notranslate nohighlight">\(i\)</span> and <span class="math notranslate nohighlight">\(j\)</span>.</p>
+</section>
+</section>
+<section id="optimal-graph-structures">
+<h2>Optimal Graph Structures<a class="headerlink" href="#optimal-graph-structures" title="Link to this heading">¶</a></h2>
+<section id="stochastic-block-model">
+<h3>Stochastic Block Model<a class="headerlink" href="#stochastic-block-model" title="Link to this heading">¶</a></h3>
+<p>For graph ensembles following a Stochastic Block Model (SBM), we derive the optimal block matrix <span class="math notranslate nohighlight">\(B\)</span> that maximizes higher-order homophily:</p>
+<div class="math notranslate nohighlight">
+\[B = \frac{\langle d \rangle}{k} \Pi^{-1} P_k \Pi^{-1}\]</div>
+<p>where <span class="math notranslate nohighlight">\(\Pi\)</span> is the diagonal matrix of class proportions, <span class="math notranslate nohighlight">\(\langle d \rangle\)</span> is the desired mean degree, and <span class="math notranslate nohighlight">\(P_k\)</span> is a symmetric permutation matrix.</p>
+</section>
+<section id="structure-characterization">
+<h3>Structure Characterization<a class="headerlink" href="#structure-characterization" title="Link to this heading">¶</a></h3>
+<p>The optimal graph structures for MPNNs are precisely those formed by unions of fully connected single-class clusters and bipartite connections between different classes. This result guides our graph rewiring strategy to enhance MPNN performance.</p>
+</section>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="index.html">BRIDGE</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<p class="caption" role="heading"><span class="caption-text">Documentation</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="getting-started.html">Getting Started</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Theoretical Framework</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#signal-to-noise-ratio-framework">Signal-to-Noise Ratio Framework</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#higher-order-homophily">Higher-Order Homophily</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#homophilic-bottlenecks">Homophilic Bottlenecks</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#optimal-graph-structures">Optimal Graph Structures</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="rewiring/index.html">Graph Rewiring</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="getting-started.html" title="previous chapter">Getting Started</a></li>
+      <li>Next: <a href="rewiring/index.html" title="next chapter">Graph Rewiring</a></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2025, JONATHAN.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 7.2.6</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.13</a>
+      
+      |
+      <a href="_sources/theory.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>
