@@ -60,6 +60,13 @@ The `datasets` package provides functionality for creating and working with grap
 
 - [SyntheticGraphDataset]({% link api-reference/synthetic-dataset.md %}): Generate synthetic graphs with controllable properties
 
+### bridge.optimization
+
+The `optimization` package provides objective functions for hyperparameter optimization with Optuna.
+
+- [objective_gcn]({% link api-reference/objective-gcn.md %}): Objective function for optimizing base GCN hyperparameters
+- [objective_rewiring]({% link api-reference/objective-rewiring.md %}): Objective function for optimizing rewiring parameters
+
 ### bridge.sensitivity
 
 The `sensitivity` package offers tools for sensitivity and SNR analysis of graph neural networks.
