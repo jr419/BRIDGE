@@ -33,7 +33,7 @@ source_suffix = {
 }
 
 # The master toctree document
-master_doc = 'index0'
+master_doc = 'index'
 
 # List of patterns to exclude from source
 exclude_patterns = []
