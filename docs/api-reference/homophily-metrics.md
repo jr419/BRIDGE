@@ -57,7 +57,7 @@ Computes the local autophily for each node in the graph. Autophily measures how 
 
 For a node i, the local p-autophily is defined as:
 
-$$a^{(p)}_i = \sum_j (\hat{A}^p_{ij})^2$$
+$$\omega^{(p)}_i = \sum_j (\hat{A}^p_{ij})^2$$
 
 where $\hat{A}$ is the normalized adjacency matrix.
 
@@ -115,7 +115,7 @@ Computes the local total connectivity for each node in the graph. Total connecti
 
 For a node i, the local p-total connectivity is defined as:
 
-$$t^{(p)}_i = \left(\sum_j \hat{A}^p_{ij}\right)^2$$
+$$\tau^{(p)}_i = \left(\sum_j \hat{A}^p_{ij}\right)^2$$
 
 where $\hat{A}$ is the normalized adjacency matrix.
 
