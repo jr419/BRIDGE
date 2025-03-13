@@ -152,5 +152,5 @@ After the graph convolution operation, a linear transformation is applied to the
 
 ## Related Components
 
-- [GCN](api-reference/gcn.md): Graph Convolutional Network that can use HPGraphConv layers
-- [SelectiveGCN](api-reference/selectivegcn.md): Extension of GCN that can operate on multiple graph versions
+- [GCN](api-reference/gcn.html): Graph Convolutional Network that can use HPGraphConv layers
+- [SelectiveGCN](api-reference/selectivegcn.html): Extension of GCN that can operate on multiple graph versions

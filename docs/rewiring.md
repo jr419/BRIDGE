@@ -120,4 +120,4 @@ Our experiments show that the BRIDGE rewiring approach significantly improves pe
 - **Heterophilic Graphs**: Creates optimal connectivity patterns that align with theoretical predictions
 - **Synthetic Datasets**: Shows consistent improvements across different homophily levels
 
-See the [Experimental Results](rewiring/experimental-results.md) page for detailed performance evaluations.
+See the [Experimental Results](rewiring/experimental-results.html) page for detailed performance evaluations.

@@ -181,4 +181,4 @@ The function is particularly useful for:
 
 ## Related Components
 
-- [run_bridge_pipeline](api-reference/bridge-pipeline.md): The core pipeline function that this function wraps
+- [run_bridge_pipeline](api-reference/bridge-pipeline.html): The core pipeline function that this function wraps

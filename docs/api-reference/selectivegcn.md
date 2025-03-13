@@ -164,6 +164,6 @@ The selective approach allows the model to leverage different graph structures f
 
 ## Related Components
 
-- [GCN](api-reference/gcn.md): Standard Graph Convolutional Network
-- [HPGraphConv](api-reference/hpgraphconv.md): High-Pass Graph Convolution layer used when `do_hp=True`
-- [run_bridge_pipeline](api-reference/bridge-pipeline.md): Pipeline that uses SelectiveGCN for improved node classification
+- [GCN](api-reference/gcn.html): Standard Graph Convolutional Network
+- [HPGraphConv](api-reference/hpgraphconv.html): High-Pass Graph Convolution layer used when `do_hp=True`
+- [run_bridge_pipeline](api-reference/bridge-pipeline.html): Pipeline that uses SelectiveGCN for improved node classification

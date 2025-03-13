@@ -140,4 +140,4 @@ python -m bridge.main --dataset_type synthetic --syn_homophily 0.3 --syn_nodes 3
 python -m bridge.main --experiment_type sensitivity --config config_examples/snr_analysis.yaml
 ```
 
-See the [CLI Reference](cli-reference.md) for more options.
+See the [CLI Reference](cli-reference.html) for more options.

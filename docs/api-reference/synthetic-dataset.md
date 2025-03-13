@@ -306,7 +306,7 @@ The dataset is particularly useful for studying the relationship between graph s
 
 ## Related Components
 
-- [run_sensitivity_experiment](api-reference/sensitivity-analysis.md): Uses synthetic datasets for controlled experiments
-- [GCN](api-reference/gcn.md): Graph Neural Network model that can be trained on synthetic datasets
-- [run_bridge_pipeline](api-reference/bridge-pipeline.md): Pipeline that can be applied to synthetic datasets
-- [generate_features](api-reference/feature-generation.md): Feature generation function used in sensitivity analysis
+- [run_sensitivity_experiment](api-reference/sensitivity-analysis.html): Uses synthetic datasets for controlled experiments
+- [GCN](api-reference/gcn.html): Graph Neural Network model that can be trained on synthetic datasets
+- [run_bridge_pipeline](api-reference/bridge-pipeline.html): Pipeline that can be applied to synthetic datasets
+- [generate_features](api-reference/feature-generation.html): Feature generation function used in sensitivity analysis
