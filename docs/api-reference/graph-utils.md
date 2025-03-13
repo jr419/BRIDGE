@@ -425,9 +425,3 @@ h_rewired = homophily(g_rewired)
 print(f"Original homophily: {h_original:.4f}")
 print(f"Rewired homophily: {h_rewired:.4f}")
 ```
-
-## Related Components
-
-- [local_homophily]({% link api-reference/local-homophily.md %}): Function for computing node-level homophily
-- [run_bridge_pipeline]({% link api-reference/bridge-pipeline.md %}): Uses these utilities in the rewiring process
-- [create_rewired_graph]({% link api-reference/create-rewired-graph.md %}): Graph rewiring function that uses these utilities

@@ -170,8 +170,3 @@ def get_metric_type(dataset_name: str) -> str:
 
 This function makes it easy to automatically choose the appropriate metric for known datasets.
 
-## Related Components
-
-- [train]({% link api-reference/train.md %}): Complete training function that uses evaluate_metrics
-- [train_one_epoch]({% link api-reference/train-one-epoch.md %}): Training function that uses evaluate_metrics
-- [train_selective]({% link api-reference/train-selective.md %}): Training function for SelectiveGCN models that uses evaluate_metrics

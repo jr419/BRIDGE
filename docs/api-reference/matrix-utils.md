@@ -272,9 +272,3 @@ mean, lower, upper = compute_confidence_interval(results)
 print(f"Mean accuracy: {mean:.4f}")
 print(f"95% CI: ({lower:.4f}, {upper:.4f})")
 ```
-
-## Related Functions
-
-- `matrix_to_permutation`: Converts a permutation matrix to its one-line notation
-- `count_2cycles`: Counts the number of 2-cycles in a permutation
-- `sort_involutions`: Sorts permutation matrices by their distance from the identity

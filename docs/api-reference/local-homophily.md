@@ -165,9 +165,3 @@ The `local_homophily` function implements the following algorithm:
 
 The implementation is optimized for sparse graphs and can handle large networks efficiently.
 
-## Related Components
-
-- [local_autophily]({% link api-reference/homophily-metrics.md %}): Similar function that measures node-to-self connectivity
-- [local_total_connectivity]({% link api-reference/homophily-metrics.md %}): Function measuring overall connectivity regardless of class
-- [homophily]({% link api-reference/graph-utils.md %}): Function computing global graph homophily
-- [run_bridge_pipeline]({% link api-reference/bridge-pipeline.md %}): Uses local_homophily to evaluate rewired graphs

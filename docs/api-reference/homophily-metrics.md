@@ -292,9 +292,3 @@ print(f"Original homophily: {original_homophily:.4f}")
 print(f"Rewired homophily: {rewired_homophily:.4f}")
 print(f"Improvement: {(rewired_homophily - original_homophily):.4f}")
 ```
-
-## Related Components
-
-- [homophily]({% link api-reference/graph-utils.md %}): Function computing global graph homophily
-- [run_bridge_pipeline]({% link api-reference/bridge-pipeline.md %}): Uses homophily metrics to evaluate rewired graphs
-- [sensitivity]({% link sensitivity.md %}): Analysis framework that relates homophily to GNN performance
