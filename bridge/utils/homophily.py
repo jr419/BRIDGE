@@ -132,7 +132,7 @@ def local_homophily(
             values=torch.ones(A.size(0)),
             size=A.size()
         )
-        # Higher-order polynomial: I - A
+        # Low pass filter: I - A
         A = I - A
 
     # 3) Build label matrix M

@@ -65,12 +65,12 @@ def run_bridge_pipeline(
         g: Input graph
         P_k: Permutation matrix for rewiring
         h_feats_gcn: Hidden feature dimension for the base GCN
-        n_layers_gcn: Number of layers for the base GCN
+        n_layers_gcn: Number of hidden layers for the base GCN
         dropout_p_gcn: Dropout probability for the base GCN
         model_lr_gcn: Learning rate for the base GCN
         wd_gcn: Weight decay for the base GCN
         h_feats_selective: Hidden feature dimension for the selective GCN
-        n_layers_selective: Number of layers for the selective GCN
+        n_layers_selective: Number of hidden layers for the selective GCN
         dropout_p_selective: Dropout probability for the selective GCN
         model_lr_selective: Learning rate for the selective GCN
         wd_selective: Weight decay for the selective GCN
@@ -121,7 +121,7 @@ def run_bridge_pipeline(
         num_nodes = graph.num_nodes()
         num_edges = graph.num_edges()
         mean_degree = graph.in_degrees().float().mean().item()
-        mean_local_homophily = local_homophily(n_layers_selective, graph, do_hp=do_hp).mean().item()
+        mean_local_homophily = local_homophily(n_layers_selective+1, graph, do_hp=do_hp).mean().item()
         stats = {
             'num_nodes': num_nodes,
             'num_edges': num_edges,
@@ -332,12 +332,12 @@ def run_bridge_experiment(
         g: Input graph
         P_k: Permutation matrix for rewiring
         h_feats_gcn: Hidden feature dimension for the base GCN
-        n_layers_gcn: Number of layers for the base GCN
+        n_layers_gcn: Number of hidden layers for the base GCN
         dropout_p_gcn: Dropout probability for the base GCN
         model_lr_gcn: Learning rate for the base GCN
         wd_gcn: Weight decay for the base GCN
         h_feats_selective: Hidden feature dimension for the selective GCN
-        n_layers_selective: Number of layers for the selective GCN
+        n_layers_selective: Number of hidden layers for the selective GCN
         dropout_p_selective: Dropout probability for the selective GCN
         model_lr_selective: Learning rate for the selective GCN
         wd_selective: Weight decay for the selective GCN

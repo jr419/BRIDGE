@@ -26,7 +26,7 @@ class SelectiveGCN(nn.Module):
         in_feats: Input feature dimension
         h_feats: Hidden feature dimension
         out_feats: Output feature dimension
-        n_layers: Number of GCN layers
+        n_layers: Number of hidden GCN layers
         dropout_p: Dropout probability
         activation: Activation function to use (default: F.relu)
         bias: Whether to use bias in GraphConv layers
@@ -59,7 +59,7 @@ class SelectiveGCN(nn.Module):
             self.layers.append(GraphConv(in_feats, h_feats, bias=bias, allow_zero_in_degree=True))
         
         # Hidden layers (if any)
-        for _ in range(n_layers - 2):
+        for _ in range(n_layers - 1):
             if do_hp:
                 self.layers.append(HPGraphConv(h_feats, h_feats, bias=bias, allow_zero_in_degree=True))
             else:

@@ -2,7 +2,7 @@
 Graph Convolutional Network (GCN) implementations.
 
 This module provides implementations of Graph Convolutional Networks (GCNs) and
-their variants, including a High-Pass Graph Convolution (HPGraphConv).
+their variants, including a High Graph Convolution (HPGraphConv).
 """
 
 import torch
@@ -24,7 +24,7 @@ class GCN(nn.Module):
         in_feats: Input feature dimension
         h_feats: Hidden feature dimension
         out_feats: Output feature dimension
-        n_layers: Number of GCN layers
+        n_layers: Number of hidden GCN layers
         dropout_p: Dropout probability
         activation: Activation function to use (default: F.relu)
         bias: Whether to use bias in GraphConv layers
@@ -56,7 +56,7 @@ class GCN(nn.Module):
             self.layers.append(GraphConv(in_feats, h_feats, bias=bias, allow_zero_in_degree=True))
         
         # Hidden layers (if any)
-        for _ in range(n_layers - 2):
+        for _ in range(n_layers - 1):
             if do_hp:
                 self.layers.append(HPGraphConv(h_feats, h_feats, bias=bias, allow_zero_in_degree=True))
             else:
@@ -90,9 +90,9 @@ class GCN(nn.Module):
 
 class HPGraphConv(nn.Module):
     """
-    High-Pass Graph Convolution layer.
+    High Graph Convolution layer.
     
-    This layer implements a High-Pass filter for graph convolution,
+    This layer implements a High filter for graph convolution,
     represented as I - GCN, which emphasizes the difference between a node's features
     and its neighbors' features.
     
@@ -140,13 +140,13 @@ class HPGraphConv(nn.Module):
         Args:
             g: Input graph
             features: Node feature matrix
-            do_hp: Whether to compute High-Pass (I - GCN) or just GCN
+            do_hp: Whether to compute High (I - GCN) or just GCN
             
         Returns:
             torch.Tensor: Transformed node features
         """
         if do_hp:
-            # High-Pass: I - GCN
+            # High: I - GCN
             conv_h = features - self.conv(g, features)
         else:
             # Standard GCN
