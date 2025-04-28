@@ -25,6 +25,7 @@ from bridge.utils import set_seed, generate_all_symmetric_permutation_matrices, 
 from bridge.optimization import objective_gcn, objective_rewiring
 from bridge.datasets import SyntheticGraphDataset
 from bridge.sensitivity.run_experiment import run_sensitivity_experiments
+from bridge.rewiring import run_bridge_experiment, run_iterative_bridge_experiment
 
 
 def parse_args():
@@ -88,6 +89,16 @@ def parse_args():
                         help='Learning rate range for selective GCN [min, max]')
     parser.add_argument('--wd_selective_range', nargs=2, type=float, default=[1e-5, 0.1],
                         help='Weight decay range for selective GCN [min, max]')
+    
+    # Iterative rewiring parameters
+    parser.add_argument('--use_iterative_rewiring', action='store_true', 
+                        help='Use iterative rewiring approach instead of single rewiring step')
+    parser.add_argument('--n_rewire_iterations', type=int, default=10,
+                        help='Number of rewiring iterations to perform when using iterative rewiring')
+    parser.add_argument('--use_sgc', action='store_true',
+                        help='Use SGC for faster rewiring in iterative approach')
+    parser.add_argument('--sgc_k', type=int, default=2,
+                        help='Number of propagation steps for SGC in iterative rewiring')
     
     # Symmetry checking
     parser.add_argument('--check_symmetry', action='store_true', help='Check and enforce graph symmetry')
@@ -269,6 +280,12 @@ def run_rewiring_experiment(args):
                 print(f"HP mode: {do_hp}")
                 print(f"Self-loops: {args.do_self_loop}")
                 print(f"Residual connections: {args.do_residual}")
+                print(f"Using iterative rewiring: {args.use_iterative_rewiring}")
+                if args.use_iterative_rewiring:
+                    print(f"  - Rewiring iterations: {args.n_rewire_iterations}")
+                    print(f"  - Using SGC: {args.use_sgc}")
+                    if args.use_sgc:
+                        print(f"  - SGC propagation steps: {args.sgc_k}")
                 
                 # Create dataset-specific study names
                 gcn_study_name = f"gcn-{dataset_name}-{timestamp}"
@@ -352,9 +369,102 @@ def run_rewiring_experiment(args):
                 
                 rewiring_study.optimize(rewiring_objective, n_trials=args.num_trials)
                 
+                # Get best rewiring parameters
+                best_rewiring_params = rewiring_study.best_params
+                print("\nBest rewiring parameters:", best_rewiring_params)
+                
+                # Apply best rewiring strategy to the graph
+                matrix_idx = best_rewiring_params.get('matrix_idx', 0)
+                P_k = all_matrices[matrix_idx]
+                p_add = best_rewiring_params.get('p_add')
+                p_remove = best_rewiring_params.get('p_remove')
+                temperature = best_rewiring_params.get('temperature')
+                d_out = best_rewiring_params.get('d_out')
+                
+                # Select GCN hyperparameters
+                h_feats_gcn = best_gcn_params['h_feats']
+                n_layers_gcn = best_gcn_params['n_layers']
+                dropout_p_gcn = best_gcn_params['dropout_p']
+                model_lr_gcn = best_gcn_params['model_lr']
+                wd_gcn = best_gcn_params['weight_decay']
+                
+                # Select selective GCN hyperparameters
+                h_feats_sel = best_rewiring_params.get('h_feats_selective')
+                n_layers_sel = best_rewiring_params.get('n_layers_selective')
+                dropout_p_sel = best_rewiring_params.get('dropout_p_selective')
+                model_lr_sel = best_rewiring_params.get('model_lr_selective')
+                wd_sel = best_rewiring_params.get('weight_decay_selective')
+                
+                # Run final experiment with best parameters
+                if args.use_iterative_rewiring:
+                    # Run iterative rewiring experiment
+                    print(f"Running iterative rewiring experiment with {args.n_rewire_iterations} iterations...")
+                    stats_dict, results_list = run_iterative_bridge_experiment(
+                        g,
+                        P_k=P_k,
+                        h_feats_gcn=h_feats_gcn,
+                        n_layers_gcn=n_layers_gcn,
+                        dropout_p_gcn=dropout_p_gcn,
+                        model_lr_gcn=model_lr_gcn,
+                        wd_gcn=wd_gcn,
+                        h_feats_selective=h_feats_sel,
+                        n_layers_selective=n_layers_sel,
+                        dropout_p_selective=dropout_p_sel,
+                        model_lr_selective=model_lr_sel,
+                        wd_selective=wd_sel,
+                        temperature=temperature,
+                        p_add=p_add,
+                        p_remove=p_remove,
+                        d_out=d_out,
+                        num_graphs=1,
+                        device=device,
+                        num_repeats=args.num_splits,
+                        n_epochs=1000,
+                        early_stopping=args.early_stopping,
+                        log_training=True,
+                        dataset_name=dataset_name,
+                        do_hp=do_hp,
+                        do_self_loop=args.do_self_loop,
+                        do_residual_connections=args.do_residual,
+                        use_sgc=args.use_sgc,
+                        n_rewire=args.n_rewire_iterations,
+                        K=args.sgc_k
+                    )
+                else:
+                    # Run standard rewiring experiment
+                    print("Running standard rewiring experiment...")
+                    stats_dict, results_list = run_bridge_experiment(
+                        g,
+                        P_k=P_k,
+                        h_feats_gcn=h_feats_gcn,
+                        n_layers_gcn=n_layers_gcn,
+                        dropout_p_gcn=dropout_p_gcn,
+                        model_lr_gcn=model_lr_gcn,
+                        wd_gcn=wd_gcn,
+                        h_feats_selective=h_feats_sel,
+                        n_layers_selective=n_layers_sel,
+                        dropout_p_selective=dropout_p_sel,
+                        model_lr_selective=model_lr_sel,
+                        wd_selective=wd_sel,
+                        temperature=temperature,
+                        p_add=p_add,
+                        p_remove=p_remove,
+                        d_out=d_out,
+                        num_graphs=1,
+                        device=device,
+                        num_splits=args.num_splits,
+                        n_epochs=1000,
+                        early_stopping=args.early_stopping,
+                        log_training=True,
+                        dataset_name=dataset_name,
+                        do_hp=do_hp,
+                        do_self_loop=args.do_self_loop,
+                        do_residual_connections=args.do_residual
+                    )
+                
                 # Calculate improvement
                 baseline_test_acc = gcn_study.best_trial.user_attrs['test_acc']
-                final_test_acc = rewiring_study.best_trial.user_attrs['test_acc_mean']
+                final_test_acc = stats_dict['test_acc_mean']
                 improvement = (final_test_acc - baseline_test_acc) / baseline_test_acc * 100
                 
                 # Store results for this dataset
@@ -366,23 +476,30 @@ def run_rewiring_experiment(args):
                         'test_accuracy_ci': gcn_study.best_trial.user_attrs['test_acc_ci']
                     },
                     'rewiring': {
-                        'params': rewiring_study.best_params,
+                        'params': best_rewiring_params,
                         'validation_accuracy': -rewiring_study.best_value,
-                        'test_accuracy_mean': rewiring_study.best_trial.user_attrs['test_acc_mean'],
-                        'test_accuracy_ci': rewiring_study.best_trial.user_attrs['test_acc_ci']
+                        'test_accuracy_mean': stats_dict['test_acc_mean'],
+                        'test_accuracy_ci': stats_dict['test_acc_ci']
                     },
                     'improvement_percentage': improvement,
                     'graph_stats': {
-                        'original': rewiring_study.best_trial.user_attrs['original_stats'],
-                        'rewired': rewiring_study.best_trial.user_attrs['rewired_stats']
+                        'original': stats_dict['original_stats'],
+                        'rewired': stats_dict['rewired_stats']
                     },
                     'dataset_stats': {
                         'num_nodes': g.num_nodes(),
                         'num_edges': g.num_edges(),
                         'num_features': g.ndata['feat'].shape[1],
                         'num_classes': len(torch.unique(g.ndata['label']))
-                    }
+                    },
+                    'iterative_rewiring': args.use_iterative_rewiring,
                 }
+                
+                # Add additional iterative rewiring info if used
+                if args.use_iterative_rewiring:
+                    # Extract rewiring history from the first result
+                    if results_list and 'rewiring_history' in results_list[0]:
+                        dataset_results['rewiring_history'] = results_list[0]['rewiring_history']
                 
                 all_results[dataset_name] = dataset_results
                 
@@ -401,7 +518,7 @@ def run_rewiring_experiment(args):
                 print(f"\nResults for {dataset_name}:")
                 print(f"Base GCN Test Accuracy: {baseline_test_acc:.4f}")
                 print(f"Final Test Accuracy: {final_test_acc:.4f} ± "
-                      f"{rewiring_study.best_trial.user_attrs['test_acc_ci'][1] - final_test_acc:.4f}")
+                      f"{stats_dict['test_acc_ci'][1] - final_test_acc:.4f}")
                 print(f"Improvement: {improvement:.2f}%")
                 
                 if not args.check_symmetry or check_symmetry(g):
@@ -434,7 +551,8 @@ def run_rewiring_experiment(args):
                 'Improvement (%)': results['improvement_percentage'],
                 'Nodes': results['dataset_stats']['num_nodes'],
                 'Edges': results['dataset_stats']['num_edges'],
-                'Classes': results['dataset_stats']['num_classes']
+                'Classes': results['dataset_stats']['num_classes'],
+                'Iterative': "Yes" if results.get('iterative_rewiring', False) else "No"
             })
     
     summary_df = pd.DataFrame(summary_data)
