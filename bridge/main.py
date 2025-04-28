@@ -395,6 +395,7 @@ def run_rewiring_experiment(args):
                 model_lr_sel = best_rewiring_params.get('model_lr_selective')
                 wd_sel = best_rewiring_params.get('weight_decay_selective')
                 
+                
                 # Run final experiment with best parameters
                 if args.use_iterative_rewiring:
                     # Run iterative rewiring experiment
@@ -430,6 +431,7 @@ def run_rewiring_experiment(args):
                         n_rewire=args.n_rewire_iterations,
                         K=args.sgc_k
                     )
+
                 else:
                     # Run standard rewiring experiment
                     print("Running standard rewiring experiment...")
@@ -461,12 +463,11 @@ def run_rewiring_experiment(args):
                         do_self_loop=args.do_self_loop,
                         do_residual_connections=args.do_residual
                     )
-                
                 # Calculate improvement
                 baseline_test_acc = gcn_study.best_trial.user_attrs['test_acc']
                 final_test_acc = stats_dict['test_acc_mean']
                 improvement = (final_test_acc - baseline_test_acc) / baseline_test_acc * 100
-                
+
                 # Store results for this dataset
                 dataset_results = {
                     'base_gcn': {

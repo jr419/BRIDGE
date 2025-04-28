@@ -7,12 +7,13 @@ the performance of graph neural networks.
 
 import torch
 import torch.nn.functional as F
+import torch.nn as nn
 import dgl
 import numpy as np
 from tqdm import trange
 from typing import Tuple, List, Dict, Union, Optional, Any
 
-from ..models import GCN, SelectiveGCN
+from ..models import GCN, SelectiveGCN, SGC
 from ..training import train, train_selective, get_metric_type
 from ..utils import (
     set_seed, check_symmetry, local_homophily, compute_confidence_interval
@@ -606,6 +607,7 @@ def run_iterative_bridge_pipeline(
     ########################################################################
     # 1) Log Original Graph Statistics
     ########################################################################
+
     def compute_graph_stats(graph, labels=None):
         num_nodes = graph.num_nodes()
         num_edges = graph.num_edges()
@@ -630,6 +632,7 @@ def run_iterative_bridge_pipeline(
     ########################################################################
     # 2) Iterative Rewiring Process
     ########################################################################
+
     for iter_idx in range(n_rewire):
         if log_training:
             print(f"\nRewiring Iteration {iter_idx+1}/{n_rewire}")
@@ -692,6 +695,7 @@ def run_iterative_bridge_pipeline(
         ########################################################################
         # 3) Compute B_opt from predicted classes and rewire graph
         ########################################################################
+
         pi = Z_pred.cpu().numpy().sum(0) / n_nodes
         Pi_inv = np.diag(1/pi)
         B_opt = (d_out/k) * Pi_inv @ P_k @ Pi_inv
