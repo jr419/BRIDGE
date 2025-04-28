@@ -1,0 +1,18 @@
+
+\begin{table}[htbp]
+\centering
+\caption{Model Performance Before and After Rewiring (Cora, Citeseer, Pubmed)}
+\label{tab:accuracies}
+\makebox[\textwidth]{\begin{tabular}{lccc}
+\toprule
+Model & Cora & Citeseer & Pubmed \\
+\midrule
+High-Pass GCN (Base) & 79.30 ± 0.34 & 68.82 ± 0.20 & -- \\
+High-Pass GCN (Rewired) & 79.34 ± 0.47 & \textbf{69.34 ± 0.29} & -- \\
+\midrule
+Low-Pass GCN (Base) & 78.08 ± 0.12 & 69.00 ± 0.75 & -- \\
+Low-Pass GCN (Rewired) & \textbf{79.20 ± 0.40} & 69.80 ± 0.72 & -- \\
+\midrule
+\bottomrule
+\end{tabular}}
+\end{table}

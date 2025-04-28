@@ -4,6 +4,7 @@
 seed : 42
 device : cuda
 num_trials : 3
+num_splits: 100
 experiment_name : synthetic_experiment
 
 # Model settings

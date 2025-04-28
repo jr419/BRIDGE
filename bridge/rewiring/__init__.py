@@ -6,6 +6,12 @@ the performance of graph neural networks while preserving important information.
 """
 
 from .operations import create_rewired_graph
-from .pipeline import run_bridge_pipeline, run_bridge_experiment
+from .pipeline import run_bridge_pipeline, run_bridge_experiment, run_iterative_bridge_pipeline, run_iterative_bridge_experiment
 
-__all__ = ['create_rewired_graph', 'run_bridge_pipeline', 'run_bridge_experiment']
+__all__ = [
+    'create_rewired_graph',
+    'run_bridge_pipeline',
+    'run_bridge_experiment',
+    'run_iterative_bridge_pipeline',
+    'run_iterative_bridge_experiment'
+]

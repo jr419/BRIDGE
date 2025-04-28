@@ -29,7 +29,7 @@ def train_and_evaluate_gcn(
     n_epochs: int = 1000,
     early_stopping: int = 50,
     device: Union[str, torch.device] = 'cpu',
-    num_repeats: int = 10,
+    num_splits: int = 100,
     log_training: bool = False,
     do_hp: bool = False,
     do_residual_connections: bool = False,
@@ -48,7 +48,7 @@ def train_and_evaluate_gcn(
         n_epochs: Maximum number of training epochs
         early_stopping: Number of epochs to look back for early stopping
         device: Device to perform computations on
-        num_repeats: Number of times to repeat the experiment
+        num_splits: Number of times to repeat the experiment
         log_training: Whether to print training progress
         do_hp: Whether to use higher-order polynomial filters
         do_residual_connections: Whether to use residual connections
@@ -74,7 +74,7 @@ def train_and_evaluate_gcn(
     
     # If masks are 2D, there are multiple splits
     has_multiple_splits = len(train_mask.shape) > 1
-    num_splits = train_mask.shape[1] if has_multiple_splits else num_repeats
+    num_splits = train_mask.shape[1] if has_multiple_splits else num_splits
 
     for split_idx in trange(num_splits):
         set_seed(split_idx)
@@ -150,6 +150,7 @@ def objective_gcn(
     g: dgl.DGLGraph,
     device: Union[str, torch.device] = 'cpu',
     n_epochs: int = 1000,
+    num_splits: int = 100,
     early_stopping: int = 50,
     do_hp: bool = False,
     do_residual_connections: bool = False,
@@ -199,7 +200,7 @@ def objective_gcn(
     train_acc, val_acc, test_acc, train_acc_ci, val_acc_ci, test_acc_ci = train_and_evaluate_gcn(
         g=g,
         device=device,
-        num_repeats=10,
+        num_splits=num_splits,
         n_epochs=n_epochs,
         early_stopping=early_stopping,
         do_hp=do_hp,
@@ -267,6 +268,7 @@ def objective_rewiring(
     all_matrices: List[np.ndarray],
     device: Union[str, torch.device] = 'cpu',
     n_epochs: int = 1000,
+    num_splits: int = 100,
     early_stopping: int = 50,
     do_hp: bool = False,
     do_self_loop: bool = False,
@@ -369,7 +371,7 @@ def objective_rewiring(
         d_out=d_out,
         num_graphs=num_graphs,
         device=device,
-        num_repeats=10,
+        num_splits=num_splits,
         n_epochs=n_epochs,
         early_stopping=early_stopping,
         log_training=False,

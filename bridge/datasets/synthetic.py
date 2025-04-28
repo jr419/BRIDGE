@@ -12,6 +12,8 @@ import dgl
 from dgl.data import DGLDataset
 from typing import Optional, Tuple, List, Dict, Union, Any
 
+from bridge.utils.dataset_processing import add_train_val_test_splits
+
 
 class SyntheticGraphDataset(DGLDataset):
     """
@@ -116,20 +118,7 @@ class SyntheticGraphDataset(DGLDataset):
         self.graph.ndata['feat'] = torch.zeros(n, self.in_feats, dtype=torch.float32)
         
         # -- Create train/validation/test masks --
-        train_mask = torch.zeros(n, dtype=torch.bool)
-        val_mask = torch.zeros(n, dtype=torch.bool)
-        test_mask = torch.zeros(n, dtype=torch.bool)
-        full_mask = np.random.choice(n, n, replace=False)
-        train_indices = full_mask[:int(n * 0.8)]
-        val_indices = full_mask[int(n * 0.8):int(n * 0.9)]
-        test_indices = full_mask[int(n * 0.9):]
-        train_mask[train_indices] = True
-        val_mask[val_indices] = True
-        test_mask[test_indices] = True
-        
-        self.graph.ndata['train_mask'] = train_mask
-        self.graph.ndata['val_mask'] = val_mask
-        self.graph.ndata['test_mask'] = test_mask
+        self.graph = add_train_val_test_splits(self.graph, 0.6, num_splits=100)
 
         # Save B for potential further inspection.
         self.B = B

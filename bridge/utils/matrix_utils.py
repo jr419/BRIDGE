@@ -11,29 +11,56 @@ import math
 from itertools import permutations
 from ortools.linear_solver import pywraplp
 from typing import Tuple, List, Dict, Union, Optional, Any
-
+import scipy.stats as stats
 
 def compute_confidence_interval(data: List[float], confidence: float = 0.95) -> Tuple[float, float, float]:
     """
-    Compute the mean and confidence interval (z-approximation for large samples).
-    
+    Compute the mean and confidence interval using the t-distribution.
+    Suitable for small sample sizes when the population standard deviation is unknown.
+
     Args:
-        data: List of values to compute confidence interval for
-        confidence: Confidence level (default: 0.95 for 95% CI)
-        
+        data: List of numerical values.
+        confidence: Desired confidence level (e.g., 0.95 for 95% CI).
+
     Returns:
         Tuple[float, float, float]:
             - Mean value
             - Lower bound of the confidence interval
             - Upper bound of the confidence interval
+        Returns (mean, NaN, NaN) if sample size is less than 2.
     """
     arr = np.array(data)
-    mean_ = np.mean(arr)
-    std_ = np.std(arr, ddof=1)  # unbiased estimator
     n = len(arr)
-    z = 1.96  # for 95% CI if n is large
-    half_width = z * (std_ / math.sqrt(n))
-    return mean_, mean_ - half_width, mean_ + half_width
+
+    if n < 2:
+        # Cannot compute std deviation or CI with less than 2 points
+        mean_ = np.mean(arr) if n == 1 else np.nan # Handle n=0 and n=1
+        print("Warning: Sample size < 2, cannot compute standard deviation or confidence interval.")
+        return mean_, np.nan, np.nan
+
+    mean_ = np.mean(arr)
+    std_ = np.std(arr, ddof=1)  # Sample standard deviation (uses n-1 in denominator)
+
+    # Degrees of freedom
+    df = n - 1
+
+    # Calculate the critical t-value using the percent point function (ppf),
+    # which is the inverse of the cumulative distribution function (CDF).
+    # For a two-sided interval with confidence C, we want the value t such that
+    # the area between -t and +t is C. This leaves (1-C)/2 in each tail.
+    # So, we look up the t-value for the cumulative probability C + (1-C)/2 = (1+C)/2.
+    alpha = 1 - confidence
+    t_crit = stats.t.ppf(1 - alpha / 2, df)
+
+    # Calculate the margin of error (half-width)
+    # Standard Error (SE) = std_ / sqrt(n)
+    margin_of_error = t_crit * (std_ / math.sqrt(n))
+
+    # Calculate the confidence interval
+    lower_bound = mean_ - margin_of_error
+    upper_bound = mean_ + margin_of_error
+
+    return mean_, lower_bound, upper_bound
 
 
 def infer_B(g: torch.Tensor, Z: torch.Tensor, sym: bool = True) -> torch.Tensor:

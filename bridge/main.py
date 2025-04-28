@@ -19,6 +19,8 @@ import argparse
 from typing import List, Dict, Any
 
 # Use absolute imports
+
+from bridge.utils.dataset_processing import add_train_val_test_splits
 from bridge.utils import set_seed, generate_all_symmetric_permutation_matrices, check_symmetry
 from bridge.optimization import objective_gcn, objective_rewiring
 from bridge.datasets import SyntheticGraphDataset
@@ -41,6 +43,7 @@ def parse_args():
     parser.add_argument('--seed', type=int, default=42, help='Random seed')
     parser.add_argument('--device', type=str, default='cuda', help='Device to use (cuda or cpu)')
     parser.add_argument('--num_trials', type=int, default=300, help='Number of optimization trials')
+    parser.add_argument('--num_splits', type=int, default=100, help='Number of splits for CI calculation')
     parser.add_argument('--experiment_name', type=str, default=None, help='Name of the experiment')
     
     # Model settings
@@ -235,6 +238,8 @@ def run_rewiring_experiment(args):
     for dataset in datasets:
         try:
             g = dataset[0]
+            #add train val test masks 
+            g = add_train_val_test_splits(g, split_ratio=0.6, num_splits=args.num_splits)
             dataset_name = dataset.name.strip('_v2')
             exit_sym_loop = False
             
@@ -278,6 +283,7 @@ def run_rewiring_experiment(args):
                         g, 
                         device=device,
                         n_epochs=1000,
+                        num_splits=args.num_splits,
                         early_stopping=args.early_stopping,
                         do_hp=do_hp,
                         do_residual_connections=args.do_residual,
@@ -320,6 +326,7 @@ def run_rewiring_experiment(args):
                         all_matrices,
                         device=device,
                         n_epochs=1000,
+                        num_splits=args.num_splits,
                         early_stopping=args.early_stopping,
                         do_hp=do_hp,
                         do_self_loop=args.do_self_loop,

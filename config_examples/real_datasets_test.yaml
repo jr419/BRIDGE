@@ -4,7 +4,8 @@
 seed: 42
 device: cuda
 num_trials: 300
-experiment_name: no_self_loop_yes_hp_fixed_n_layers
+num_splits: 100
+experiment_name: large_run_yes_hp
 
 # Model settings
 do_hp: true
