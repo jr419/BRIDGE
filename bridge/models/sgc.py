@@ -42,7 +42,7 @@ def sgc_precompute(
     for _ in range(K):
         h = h * norm                          # left norm
         graph.ndata['h'] = h
-        graph.update_all(fn.copy_src('h', 'm'), fn.sum('m', 'h'))
+        graph.update_all(fn.copy_u('h', 'm'), fn.sum('m', 'h'))
         h = graph.ndata.pop('h') * norm       # right norm
     
     return h  # detached tensor – ready for any classifier

@@ -22,7 +22,7 @@ from typing import List, Dict, Any
 
 from bridge.utils.dataset_processing import add_train_val_test_splits
 from bridge.utils import set_seed, generate_all_symmetric_permutation_matrices, check_symmetry
-from bridge.optimization import objective_gcn, objective_rewiring
+from bridge.optimization import objective_gcn, objective_rewiring, objective_iterative_rewiring
 from bridge.datasets import SyntheticGraphDataset
 from bridge.sensitivity.run_experiment import run_sensitivity_experiments
 from bridge.rewiring import run_bridge_experiment, run_iterative_bridge_experiment
@@ -336,28 +336,55 @@ def run_rewiring_experiment(args):
                 
                 # Create and setup the objective function for rewiring optimization
                 def rewiring_objective(trial):
-                    return objective_rewiring(
-                        trial, 
-                        g, 
-                        best_gcn_params, 
-                        all_matrices,
-                        device=device,
-                        n_epochs=1000,
-                        num_splits=args.num_splits,
-                        early_stopping=args.early_stopping,
-                        do_hp=do_hp,
-                        do_self_loop=args.do_self_loop,
-                        do_residual_connections=args.do_residual,
-                        dataset_name=dataset_name,
-                        temperature_range=args.temperature_range,
-                        p_add_range=args.p_add_range,
-                        p_remove_range=args.p_remove_range,
-                        h_feats_selective_options=args.h_feats_selective_options,
-                        n_layers_selective_options=args.n_layers_selective_options,
-                        dropout_selective_range=args.dropout_selective_range,
-                        lr_selective_range=args.lr_selective_range,
-                        wd_selective_range=args.wd_selective_range
-                    )
+                    if args.use_iterative_rewiring:
+                        return objective_iterative_rewiring(
+                            trial, 
+                            g, 
+                            best_gcn_params, 
+                            all_matrices,
+                            device=device,
+                            n_epochs=1000,
+                            num_splits=args.num_splits,
+                            early_stopping=args.early_stopping,
+                            do_hp=do_hp,
+                            do_self_loop=args.do_self_loop,
+                            do_residual_connections=args.do_residual,
+                            dataset_name=dataset_name,
+                            temperature_range=args.temperature_range,
+                            p_add_range=args.p_add_range,
+                            p_remove_range=args.p_remove_range,
+                            h_feats_selective_options=args.h_feats_selective_options,
+                            n_layers_selective_options=args.n_layers_selective_options,
+                            dropout_selective_range=args.dropout_selective_range,
+                            lr_selective_range=args.lr_selective_range,
+                            wd_selective_range=args.wd_selective_range,
+                            n_rewire_iterations=args.n_rewire_iterations,
+                            use_sgc=args.use_sgc,
+                            sgc_k=args.sgc_k
+                        )
+                    else:
+                        return objective_rewiring(
+                            trial, 
+                            g, 
+                            best_gcn_params, 
+                            all_matrices,
+                            device=device,
+                            n_epochs=1000,
+                            num_splits=args.num_splits,
+                            early_stopping=args.early_stopping,
+                            do_hp=do_hp,
+                            do_self_loop=args.do_self_loop,
+                            do_residual_connections=args.do_residual,
+                            dataset_name=dataset_name,
+                            temperature_range=args.temperature_range,
+                            p_add_range=args.p_add_range,
+                            p_remove_range=args.p_remove_range,
+                            h_feats_selective_options=args.h_feats_selective_options,
+                            n_layers_selective_options=args.n_layers_selective_options,
+                            dropout_selective_range=args.dropout_selective_range,
+                            lr_selective_range=args.lr_selective_range,
+                            wd_selective_range=args.wd_selective_range
+                        )
                 
                 # Create and run study for rewiring optimization
                 rewiring_study = optuna.create_study(
@@ -395,7 +422,6 @@ def run_rewiring_experiment(args):
                 model_lr_sel = best_rewiring_params.get('model_lr_selective')
                 wd_sel = best_rewiring_params.get('weight_decay_selective')
                 
-                
                 # Run final experiment with best parameters
                 if args.use_iterative_rewiring:
                     # Run iterative rewiring experiment
@@ -422,7 +448,7 @@ def run_rewiring_experiment(args):
                         num_repeats=args.num_splits,
                         n_epochs=1000,
                         early_stopping=args.early_stopping,
-                        log_training=True,
+                        log_training=False,
                         dataset_name=dataset_name,
                         do_hp=do_hp,
                         do_self_loop=args.do_self_loop,
@@ -431,7 +457,6 @@ def run_rewiring_experiment(args):
                         n_rewire=args.n_rewire_iterations,
                         K=args.sgc_k
                     )
-
                 else:
                     # Run standard rewiring experiment
                     print("Running standard rewiring experiment...")
@@ -457,17 +482,18 @@ def run_rewiring_experiment(args):
                         num_splits=args.num_splits,
                         n_epochs=1000,
                         early_stopping=args.early_stopping,
-                        log_training=True,
+                        log_training=False,
                         dataset_name=dataset_name,
                         do_hp=do_hp,
                         do_self_loop=args.do_self_loop,
                         do_residual_connections=args.do_residual
                     )
+                
                 # Calculate improvement
                 baseline_test_acc = gcn_study.best_trial.user_attrs['test_acc']
                 final_test_acc = stats_dict['test_acc_mean']
                 improvement = (final_test_acc - baseline_test_acc) / baseline_test_acc * 100
-
+                
                 # Store results for this dataset
                 dataset_results = {
                     'base_gcn': {

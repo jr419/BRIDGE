@@ -654,7 +654,7 @@ def run_iterative_bridge_pipeline(
             model.train()
             for _ in range(min(100, n_epochs)):  # SGC converges much faster
                 optimizer.zero_grad()
-                logits = model(g_rewired, feat)
+                logits = model(g_rewired.to(device), feat.to(device))
                 loss = loss_fcn(logits[train_mask], labels[train_mask])
                 loss.backward()
                 optimizer.step()
@@ -674,7 +674,7 @@ def run_iterative_bridge_pipeline(
                 
                 model.train()
                 optimizer.zero_grad()
-                logits = model(g_rewired, feat)
+                logits = model(g_rewired.to(device), feat.to(device))
                 loss = loss_fcn(logits[train_mask], labels[train_mask])
                 loss.backward()
                 optimizer.step()
