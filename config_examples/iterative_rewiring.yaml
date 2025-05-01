@@ -2,7 +2,7 @@
 
 # Experiment type and name
 experiment_type: "rewiring"
-experiment_name: "iterative_selective_rewiring_with_hyperparams_full"
+experiment_name: "iterative_selective_rewiring_fixed_pretraining_full"
 
 # General settings
 seed: 42

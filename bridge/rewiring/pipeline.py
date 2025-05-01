@@ -651,19 +651,19 @@ def run_iterative_bridge_pipeline(
             # Use fast SGC for first classification with custom hyperparameters
             model = SGC(in_feats, out_feats, K=sgc_K).to(device)
             
-            # Train SGC with specific learning rate and weight decay
-            optimizer = torch.optim.Adam(
-                model.parameters(), lr=sgc_lr, weight_decay=sgc_wd
+            train_acc_cold, val_acc_cold, test_acc_cold, model = train(
+                g,
+                model,
+                train_mask,
+                val_mask,
+                test_mask,
+                model_lr=sgc_lr,
+                optimizer_weight_decay=sgc_wd,
+                n_epochs=n_epochs,
+                early_stopping=early_stopping,
+                log_training=log_training,
+                metric_type=get_metric_type(dataset_name)
             )
-            loss_fcn = nn.CrossEntropyLoss()
-            
-            model.train()
-            for _ in range(min(100, n_epochs)):  # SGC converges much faster
-                optimizer.zero_grad()
-                logits = model(g_rewired.to(device), feat.to(device))
-                loss = loss_fcn(logits[train_mask], labels[train_mask])
-                loss.backward()
-                optimizer.step()
                 
             # Get predicted class distribution
             model.eval()
@@ -694,20 +694,19 @@ def run_iterative_bridge_pipeline(
             # Use SelectiveSGC for classification
             model = SelectiveSGC(in_feats, out_feats, K=sgc_K).to(device)
             
-            # Train SelectiveSGC with selective model hyperparameters
-            optimizer = torch.optim.Adam(
-                model.parameters(), lr=model_lr_selective, weight_decay=wd_selective
+            train_acc_sel, val_acc_sel, test_acc_sel, model = train_selective(
+                g_list,
+                model,
+                train_mask,
+                val_mask,
+                test_mask,
+                model_lr=sgc_lr,
+                optimizer_weight_decay=sgc_wd,
+                n_epochs=n_epochs,
+                early_stopping=early_stopping,
+                log_training=log_training,
+                metric_type=get_metric_type(dataset_name)
             )
-            loss_fcn = nn.CrossEntropyLoss()
-            
-            model.train()
-            for _ in range(min(100, n_epochs)):  # SGC converges much faster
-                optimizer.zero_grad()
-                logits = model(g_list, feat.to(device))
-                loss = loss_fcn(logits[train_mask], labels[train_mask])
-                loss.backward()
-                optimizer.step()
-                
             # Get predicted class distribution
             model.eval()
             with torch.no_grad():
@@ -807,27 +806,27 @@ def run_iterative_bridge_pipeline(
         'selective_mask': str(node_mask.bincount(minlength=len(g_list)).cpu().numpy())
     })
     
-    ########################################################################
-    # 5) Train Cold-Start GCN on Original Graph
-    ########################################################################
-    model_cold = GCN(
-        in_feats, h_feats_gcn, out_feats, n_layers_gcn,
-        dropout_p_gcn, residual_connection=do_residual_connections, do_hp=do_hp
-    ).to(device)
+    # ########################################################################
+    # # 5) Train Cold-Start GCN on Original Graph
+    # ########################################################################
+    # model_cold = GCN(
+    #     in_feats, h_feats_gcn, out_feats, n_layers_gcn,
+    #     dropout_p_gcn, residual_connection=do_residual_connections, do_hp=do_hp
+    # ).to(device)
     
-    train_acc_cold, val_acc_cold, test_acc_cold, model_cold = train(
-        g_original,
-        model_cold,
-        train_mask,
-        val_mask,
-        test_mask,
-        model_lr=model_lr_gcn,
-        optimizer_weight_decay=wd_gcn,
-        n_epochs=n_epochs,
-        early_stopping=early_stopping,
-        log_training=log_training,
-        metric_type=get_metric_type(dataset_name)
-    )
+    # train_acc_cold, val_acc_cold, test_acc_cold, model_cold = train(
+    #     g_original,
+    #     model_cold,
+    #     train_mask,
+    #     val_mask,
+    #     test_mask,
+    #     model_lr=model_lr_gcn,
+    #     optimizer_weight_decay=wd_gcn,
+    #     n_epochs=n_epochs,
+    #     early_stopping=early_stopping,
+    #     log_training=log_training,
+    #     metric_type=get_metric_type(dataset_name)
+    # )
     
     ########################################################################
     # 6) Train Selective GCN on Original and Final Rewired Graph
@@ -855,9 +854,9 @@ def run_iterative_bridge_pipeline(
     # Compile results
     results = {
         'cold_start': {
-            'train_acc': train_acc_cold,
-            'val_acc': val_acc_cold,
-            'test_acc': test_acc_cold,
+            'train_acc': -1,
+            'val_acc': -1,
+            'test_acc': -1,
         },
         'selective': {
             'train_acc': train_acc_sel,

@@ -32,6 +32,7 @@ def train_and_evaluate_gcn(
     num_splits: int = 100,
     log_training: bool = False,
     do_hp: bool = False,
+    do_self_loop: bool = False,
     do_residual_connections: bool = False,
     dataset_name: str = 'unknown'
 ) -> Tuple[float, float, float, Tuple[float, float], Tuple[float, float], Tuple[float, float]]:
@@ -51,6 +52,7 @@ def train_and_evaluate_gcn(
         num_splits: Number of times to repeat the experiment
         log_training: Whether to print training progress
         do_hp: Whether to use higher-order polynomial filters
+        do_self_loop: Whether to add self-loops
         do_residual_connections: Whether to use residual connections
         dataset_name: Name of the dataset
         
@@ -76,6 +78,10 @@ def train_and_evaluate_gcn(
     has_multiple_splits = len(train_mask.shape) > 1
     num_splits = train_mask.shape[1] if has_multiple_splits else num_splits
 
+    if do_self_loop:
+        g = dgl.remove_self_loop(g)
+        g = dgl.add_self_loop(g)
+        
     for split_idx in trange(num_splits):
         set_seed(split_idx)
         

@@ -22,7 +22,7 @@ from typing import List, Dict, Any
 
 from bridge.utils.dataset_processing import add_train_val_test_splits
 from bridge.utils import set_seed, generate_all_symmetric_permutation_matrices, check_symmetry
-from bridge.optimization import objective_gcn, objective_rewiring, objective_iterative_rewiring
+from bridge.optimization import objective_gcn, objective_rewiring, objective_iterative_rewiring, train_and_evaluate_gcn
 from bridge.datasets import SyntheticGraphDataset
 from bridge.sensitivity.run_experiment import run_sensitivity_experiments
 from bridge.rewiring import run_bridge_experiment, run_iterative_bridge_experiment
@@ -443,6 +443,28 @@ def run_rewiring_experiment(args):
                     sgc_lr = best_rewiring_params.get('sgc_lr')
                 
                 # Run final experiment with best parameters
+
+                # baseline GCN
+                print("Running baseline GCN experiment...")
+                (mean_train_gcn, mean_val_gcn, mean_test_gcn, train_ci_gcn, val_ci_gcn, test_ci_gcn) = train_and_evaluate_gcn(
+                    g = g,
+                    h_feats = h_feats_gcn,
+                    n_layers = n_layers_gcn,
+                    dropout_p = dropout_p_gcn,
+                    model_lr = model_lr_gcn,
+                    weight_decay = wd_gcn,
+                    n_epochs = 1000,
+                    early_stopping = args.early_stopping,
+                    device = device,
+                    num_splits = args.num_splits,
+                    log_training = False,
+                    do_hp = do_hp,
+                    do_self_loop = args.do_self_loop,
+                    do_residual_connections = args.do_residual,
+                    dataset_name = dataset_name,
+                    )
+
+                # rewiring
                 if args.use_iterative_rewiring:
                     # Run iterative rewiring experiment
                     print(f"Running iterative rewiring experiment with {n_rewire_iterations} iterations...")
@@ -512,7 +534,7 @@ def run_rewiring_experiment(args):
                     )
                 
                 # Calculate improvement
-                baseline_test_acc = gcn_study.best_trial.user_attrs['test_acc']
+                baseline_test_acc = mean_test_gcn
                 final_test_acc = stats_dict['test_acc_mean']
                 improvement = (final_test_acc - baseline_test_acc) / baseline_test_acc * 100
                 
@@ -520,9 +542,9 @@ def run_rewiring_experiment(args):
                 dataset_results = {
                     'base_gcn': {
                         'params': best_gcn_params,
-                        'validation_accuracy': -gcn_study.best_value,
-                        'test_accuracy': gcn_study.best_trial.user_attrs['test_acc'],
-                        'test_accuracy_ci': gcn_study.best_trial.user_attrs['test_acc_ci']
+                        'validation_accuracy': -mean_val_gcn,
+                        'test_accuracy': mean_test_gcn,
+                        'test_accuracy_ci': (test_ci_gcn[0], test_ci_gcn[1]),
                     },
                     'rewiring': {
                         'params': best_rewiring_params,
