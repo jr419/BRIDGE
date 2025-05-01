@@ -73,6 +73,10 @@ def parse_args():
                         help='Number of layers to try for GCN')
     parser.add_argument('--gcn_dropout_range', nargs=2, type=float, default=[0.0, 0.7],
                         help='Dropout range for GCN [min, max]')
+    parser.add_argument('--lr_gcn_range', nargs=2, type=float, default=[1e-5, 0.1],
+                        help='Learning rate range for GCN [min, max]')
+    parser.add_argument('--wd_gcn_range', nargs=2, type=float, default=[1e-5, 0.1],
+                        help='Weight decay range for GCN [min, max]')
     parser.add_argument('--temperature_range', nargs=2, type=float, default=[1e-5, 2.0],
                         help='Temperature range for softmax [min, max]')
     parser.add_argument('--p_add_range', nargs=2, type=float, default=[0.0, 1.0],
@@ -93,15 +97,19 @@ def parse_args():
     # Iterative rewiring parameters
     parser.add_argument('--use_iterative_rewiring', action='store_true', 
                         help='Use iterative rewiring approach instead of single rewiring step')
-    parser.add_argument('--n_rewire_iterations', type=int, default=10,
-                        help='Number of rewiring iterations to perform when using iterative rewiring')
+    parser.add_argument('--n_rewire_iterations_range', nargs=2, type=int, default=[1, 20],
+                      help='Range of rewiring iterations to try during optimization [min, max]')
     parser.add_argument('--use_sgc', action='store_true',
                         help='Use SGC for faster rewiring in iterative approach')
-    parser.add_argument('--sgc_k', type=int, default=2,
+    parser.add_argument('--sgc_K_options', type=int, default=[1, 2, 3],
+                        help='Number of propagation steps for SGC in iterative rewiring')
+    parser.add_argument('--sgc_wd_range', type=int, default=[1e-5, 0.1],
+                        help='Number of propagation steps for SGC in iterative rewiring')
+    parser.add_argument('--sgc_lr_range', type=int, default=[1e-5, 0.1],
                         help='Number of propagation steps for SGC in iterative rewiring')
     
     # Symmetry checking
-    parser.add_argument('--check_symmetry', action='store_true', help='Check and enforce graph symmetry')
+    parser.add_argument('--check_symmetry', action='store_false', help='Check and enforce graph symmetry')
     
     return parser.parse_args()
 
@@ -282,10 +290,12 @@ def run_rewiring_experiment(args):
                 print(f"Residual connections: {args.do_residual}")
                 print(f"Using iterative rewiring: {args.use_iterative_rewiring}")
                 if args.use_iterative_rewiring:
-                    print(f"  - Rewiring iterations: {args.n_rewire_iterations}")
+                    print(f"  - Rewiring iterations: {args.n_rewire_iterations_range}")
                     print(f"  - Using SGC: {args.use_sgc}")
                     if args.use_sgc:
-                        print(f"  - SGC propagation steps: {args.sgc_k}")
+                        print(f"  - SGC propagation steps: {args.sgc_K_options}")
+                        print(f"  - SGC weight decay: {args.sgc_wd_range}")
+                        print(f"  - SGC learning rate: {args.sgc_lr_range}")
                 
                 # Create dataset-specific study names
                 gcn_study_name = f"gcn-{dataset_name}-{timestamp}"
@@ -307,7 +317,9 @@ def run_rewiring_experiment(args):
                         dataset_name=dataset_name,
                         h_feats_options=args.gcn_h_feats,
                         n_layers_options=args.gcn_n_layers,
-                        dropout_range=args.gcn_dropout_range
+                        dropout_range=args.gcn_dropout_range,
+                        lr_range=args.lr_gcn_range,
+                        weight_decay_range=args.wd_gcn_range,
                     )
                 
                 # Create and run study for GCN optimization
@@ -358,9 +370,11 @@ def run_rewiring_experiment(args):
                             dropout_selective_range=args.dropout_selective_range,
                             lr_selective_range=args.lr_selective_range,
                             wd_selective_range=args.wd_selective_range,
-                            n_rewire_iterations=args.n_rewire_iterations,
+                            n_rewire_iterations_range=args.n_rewire_iterations_range,
                             use_sgc=args.use_sgc,
-                            sgc_k=args.sgc_k
+                            sgc_K_options=args.sgc_K_options,
+                            sgc_wd_range=args.sgc_wd_range,
+                            sgc_lr_range=args.sgc_lr_range
                         )
                     else:
                         return objective_rewiring(
@@ -421,11 +435,17 @@ def run_rewiring_experiment(args):
                 dropout_p_sel = best_rewiring_params.get('dropout_p_selective')
                 model_lr_sel = best_rewiring_params.get('model_lr_selective')
                 wd_sel = best_rewiring_params.get('weight_decay_selective')
+                n_rewire_iterations = best_rewiring_params.get('n_rewire_iterations', 1)
+
+                if args.use_iterative_rewiring:
+                    sgc_K = best_rewiring_params.get('sgc_K')
+                    sgc_wd = best_rewiring_params.get('sgc_wd')
+                    sgc_lr = best_rewiring_params.get('sgc_lr')
                 
                 # Run final experiment with best parameters
                 if args.use_iterative_rewiring:
                     # Run iterative rewiring experiment
-                    print(f"Running iterative rewiring experiment with {args.n_rewire_iterations} iterations...")
+                    print(f"Running iterative rewiring experiment with {n_rewire_iterations} iterations...")
                     stats_dict, results_list = run_iterative_bridge_experiment(
                         g,
                         P_k=P_k,
@@ -454,8 +474,10 @@ def run_rewiring_experiment(args):
                         do_self_loop=args.do_self_loop,
                         do_residual_connections=args.do_residual,
                         use_sgc=args.use_sgc,
-                        n_rewire=args.n_rewire_iterations,
-                        K=args.sgc_k
+                        n_rewire=n_rewire_iterations,
+                        sgc_K=sgc_K,
+                        sgc_wd=sgc_wd,
+                        sgc_lr=sgc_lr
                     )
                 else:
                     # Run standard rewiring experiment

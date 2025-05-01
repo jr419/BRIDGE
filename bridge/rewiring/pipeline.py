@@ -9,17 +9,17 @@ import torch
 import torch.nn.functional as F
 import torch.nn as nn
 import dgl
+import dgl.function as fn
 import numpy as np
 from tqdm import trange
 from typing import Tuple, List, Dict, Union, Optional, Any
 
-from ..models import GCN, SelectiveGCN, SGC
+from ..models import GCN, SelectiveGCN, SGC, SelectiveSGC
 from ..training import train, train_selective, get_metric_type
 from ..utils import (
     set_seed, check_symmetry, local_homophily, compute_confidence_interval
 )
 from .operations import create_rewired_graph
-
 
 def run_bridge_pipeline(
     g: dgl.DGLGraph,
@@ -530,16 +530,19 @@ def run_iterative_bridge_pipeline(
     do_residual_connections: bool = False,
     use_sgc: bool = True,
     n_rewire: int = 10,
-    K: int = 2
+    sgc_K: int = 2,
+    sgc_lr: float = 1e-2,
+    sgc_wd: float = 1e-4
 ) -> Dict[str, Any]:
     """
     Run an iterative version of the BRIDGE pipeline that performs multiple rounds of rewiring.
     
     This function repeatedly:
-    1. Classifies nodes using a fast SGC model or standard GCN
-    2. Rewires the graph based on the predicted classes
-    3. Repeats the process n_rewire times
-    4. Trains a final selective GCN on the original and final rewired graph
+    1. Classifies nodes using a fast SGC model for the first iteration
+    2. For subsequent iterations, uses a SelectiveSGC model on both the original and current rewired graph
+    3. Rewires the graph based on the predicted classes
+    4. Repeats the process n_rewire times
+    5. Trains a final selective GCN on the original and final rewired graph
     
     Args:
         g: Input graph
@@ -573,7 +576,9 @@ def run_iterative_bridge_pipeline(
         do_residual_connections: Whether to use residual connections
         use_sgc: Whether to use SGC for classification (faster) or standard GCN
         n_rewire: Number of rewiring iterations
-        K: Number of propagation steps for SGC
+        sgc_K: Number of propagation steps for SGC
+        sgc_lr: Learning rate specifically for the SGC model in first iteration
+        sgc_wd: Weight decay specifically for the SGC model in first iteration
         
     Returns:
         Dict[str, Any]: Results of the rewiring pipeline, including:
@@ -598,7 +603,7 @@ def run_iterative_bridge_pipeline(
     val_mask = val_mask if val_mask is not None else g.ndata['val_mask'].bool()
     test_mask = test_mask if test_mask is not None else g.ndata['test_mask'].bool()
 
-    # Store original graph for final training
+    # Store original graph for final training and selective SGC
     g_original = g.clone()
     
     # Keep track of statistics over all iterations
@@ -629,6 +634,10 @@ def run_iterative_bridge_pipeline(
     # Initialize graph for iterative rewiring
     g_rewired = g.clone()
     
+    # Initialize in_feats and out_feats
+    in_feats = feat.shape[1]
+    out_feats = int(labels.max().item()) + 1
+    
     ########################################################################
     # 2) Iterative Rewiring Process
     ########################################################################
@@ -637,17 +646,14 @@ def run_iterative_bridge_pipeline(
         if log_training:
             print(f"\nRewiring Iteration {iter_idx+1}/{n_rewire}")
         
-        # Get model for classification
-        in_feats = feat.shape[1]
-        out_feats = int(labels.max().item()) + 1
-        
-        if use_sgc:
-            # Use fast SGC for classification
-            model = SGC(in_feats, out_feats, K=K).to(device)
+        # For first iteration, use standard SGC
+        if iter_idx == 0 and use_sgc:
+            # Use fast SGC for first classification with custom hyperparameters
+            model = SGC(in_feats, out_feats, K=sgc_K).to(device)
             
-            # Train SGC 
+            # Train SGC with specific learning rate and weight decay
             optimizer = torch.optim.Adam(
-                model.parameters(), lr=model_lr_gcn, weight_decay=wd_gcn
+                model.parameters(), lr=sgc_lr, weight_decay=sgc_wd
             )
             loss_fcn = nn.CrossEntropyLoss()
             
@@ -658,33 +664,56 @@ def run_iterative_bridge_pipeline(
                 loss = loss_fcn(logits[train_mask], labels[train_mask])
                 loss.backward()
                 optimizer.step()
-        else:
-            # Use standard GCN for classification
-            model = GCN(
-                in_feats, h_feats_gcn, out_feats, n_layers_gcn,
-                dropout_p_gcn, residual_connection=do_residual_connections, do_hp=do_hp
-            ).to(device)
-            
-            # Train with early stopping
-            for _ in range(min(200, n_epochs)):  # Fewer epochs needed for rewiring
-                optimizer = torch.optim.Adam(
-                    model.parameters(), lr=model_lr_gcn, weight_decay=wd_gcn
-                )
-                loss_fcn = nn.CrossEntropyLoss()
                 
-                model.train()
+            # Get predicted class distribution
+            model.eval()
+            with torch.no_grad():
+                logits = model(g_rewired, feat)
+                Z_pred = F.softmax(logits / temperature, dim=1)  # shape: [n_nodes, out_feats]
+                pred = Z_pred.argmax(dim=1)                      # [n_nodes]
+        
+        # For subsequent iterations, use SelectiveSGC on both original and rewired graph
+        else:
+            # Prepare graph list for selective SGC
+            g_list = [g_original.to(device), g_rewired.to(device)]
+            
+            # Compute local homophily for each graph
+            lh_list = []
+            for i, g_i in enumerate(g_list):
+                lh_tensor = local_homophily(
+                    sgc_K+1, g_i.to(device), y=labels.to(device) if iter_idx == 0 else pred.to(device), do_hp=do_hp
+                )
+                lh_list.append(lh_tensor)
+
+            lh_stack = torch.stack(lh_list)
+            node_mask = lh_stack.argmax(dim=0)  # for each node, which graph is better?
+
+            for g_i in g_list:
+                g_i.ndata['mask'] = node_mask.to(device)
+                
+            # Use SelectiveSGC for classification
+            model = SelectiveSGC(in_feats, out_feats, K=sgc_K).to(device)
+            
+            # Train SelectiveSGC with selective model hyperparameters
+            optimizer = torch.optim.Adam(
+                model.parameters(), lr=model_lr_selective, weight_decay=wd_selective
+            )
+            loss_fcn = nn.CrossEntropyLoss()
+            
+            model.train()
+            for _ in range(min(100, n_epochs)):  # SGC converges much faster
                 optimizer.zero_grad()
-                logits = model(g_rewired.to(device), feat.to(device))
+                logits = model(g_list, feat.to(device))
                 loss = loss_fcn(logits[train_mask], labels[train_mask])
                 loss.backward()
                 optimizer.step()
-        
-        # Get predicted class distribution
-        model.eval()
-        with torch.no_grad():
-            logits = model(g_rewired, feat)
-            Z_pred = F.softmax(logits / temperature, dim=1)  # shape: [n_nodes, out_feats]
-            pred = Z_pred.argmax(dim=1)                      # [n_nodes]
+                
+            # Get predicted class distribution
+            model.eval()
+            with torch.no_grad():
+                logits = model(g_list, feat)
+                Z_pred = F.softmax(logits / temperature, dim=1)
+                pred = Z_pred.argmax(dim=1)
 
         # Ensure no empty classes: if any class is empty, fill it artificially
         unique_counts = pred.bincount(minlength=out_feats)
@@ -779,9 +808,8 @@ def run_iterative_bridge_pipeline(
     })
     
     ########################################################################
-    # 5) Train Selective GCN on Original and Final Rewired
+    # 5) Train Cold-Start GCN on Original Graph
     ########################################################################
-    # Train standard GCN on original graph for comparison (cold start)
     model_cold = GCN(
         in_feats, h_feats_gcn, out_feats, n_layers_gcn,
         dropout_p_gcn, residual_connection=do_residual_connections, do_hp=do_hp
@@ -801,7 +829,9 @@ def run_iterative_bridge_pipeline(
         metric_type=get_metric_type(dataset_name)
     )
     
-    # Train selective GCN on both graphs
+    ########################################################################
+    # 6) Train Selective GCN on Original and Final Rewired Graph
+    ########################################################################
     model_selective = SelectiveGCN(
         in_feats, h_feats_selective, out_feats,
         n_layers_selective, dropout_p_selective,
@@ -870,7 +900,9 @@ def run_iterative_bridge_experiment(
     do_residual_connections: bool = False,
     use_sgc: bool = True,
     n_rewire: int = 10,
-    K: int = 2
+    sgc_K: int = 2,
+    sgc_lr: float = 1e-2,
+    sgc_wd: float = 1e-4
 ) -> Tuple[Dict[str, Any], List[Dict[str, Any]]]:
     """
     Run the iterative rewiring pipeline multiple times and average the results.
@@ -907,7 +939,9 @@ def run_iterative_bridge_experiment(
         do_residual_connections: Whether to use residual connections
         use_sgc: Whether to use SGC for classification (faster) or standard GCN
         n_rewire: Number of rewiring iterations
-        K: Number of propagation steps for SGC
+        sgc_K: Number of propagation steps for SGC
+        sgc_lr: Learning rate specifically for the SGC model in first iteration
+        sgc_wd: Weight decay specifically for the SGC model in first iteration
         
     Returns:
         Tuple[Dict[str, Any], List[Dict[str, Any]]]:
@@ -979,7 +1013,9 @@ def run_iterative_bridge_experiment(
             do_residual_connections=do_residual_connections,
             use_sgc=use_sgc,
             n_rewire=n_rewire,
-            K=K
+            sgc_K=sgc_K,
+            sgc_lr=sgc_lr,
+            sgc_wd=sgc_wd
         )
         
         # Store results and statistics
@@ -1000,7 +1036,7 @@ def run_iterative_bridge_experiment(
         original_degree_list.append(results['original_stats']['mean_degree'])
         rewired_degree_list.append(results['rewired_stats']['mean_degree'])
 
-    # Compute statistics (same as before)
+    # Compute statistics
     def compute_stats(data_list):
         mean, lower, upper = compute_confidence_interval(data_list)
         return {'mean': mean, 'ci': (lower, upper)}

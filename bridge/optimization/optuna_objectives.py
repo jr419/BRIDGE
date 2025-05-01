@@ -407,7 +407,6 @@ def objective_rewiring(
     return -stats_dict['val_acc_mean']  # Minimize negative validation accuracy
 
 
-
 def objective_iterative_rewiring(
     trial: optuna.Trial,
     g: dgl.DGLGraph,
@@ -429,9 +428,11 @@ def objective_iterative_rewiring(
     dropout_selective_range: List[float] = None,
     lr_selective_range: List[float] = None,
     wd_selective_range: List[float] = None,
-    n_rewire_iterations: int = 10,
+    n_rewire_iterations_range: List[int] = None,
     use_sgc: bool = True,
-    sgc_k: int = 2
+    sgc_K_options: List[int] = None,
+    sgc_lr_range: List[float] = None,
+    sgc_wd_range: List[float] = None
 ) -> float:
     """
     Objective function for optimizing iterative rewiring and selective GCN parameters with Optuna.
@@ -460,9 +461,11 @@ def objective_iterative_rewiring(
         dropout_selective_range: Range for dropout probability in selective GCN
         lr_selective_range: Range for learning rate in selective GCN
         wd_selective_range: Range for weight decay in selective GCN
-        n_rewire_iterations: Number of rewiring iterations to perform
+        n_rewire_iterations_range: Range for number of rewiring iterations [min, max]
         use_sgc: Whether to use SGC for faster rewiring
-        sgc_k: Number of propagation steps for SGC
+        sgc_K_options: Options for number of propagation steps for SGC
+        sgc_lr_range: Range for SGC learning rate
+        sgc_wd_range: Range for SGC weight decay
         
     Returns:
         float: Negative validation accuracy (to be minimized)
@@ -476,8 +479,14 @@ def objective_iterative_rewiring(
     dropout_selective_range = dropout_selective_range or [0.0, 0.7]
     lr_selective_range = lr_selective_range or [1e-4, 1e-1]
     wd_selective_range = wd_selective_range or [1e-6, 1e-3]
+    sgc_K_options = sgc_K_options or [1, 2, 3, 4]
+    sgc_lr_range = sgc_lr_range or [1e-3, 1e-1]
+    sgc_wd_range = sgc_wd_range or [1e-5, 1e-3]
+    n_rewire_iterations_range = n_rewire_iterations_range or [1, 20]
     
-    # Sample hyperparameters (including the permutation matrix index)
+    # Sample hyperparameters
+    # Add n_rewire_iterations as a hyperparameter to optimize
+    n_rewire = trial.suggest_int('n_rewire_iterations', n_rewire_iterations_range[0], n_rewire_iterations_range[1])
     fixed_matrix_datasets = ["cora", "citeseer", "pubmed"]
     
     if dataset_name.lower() in fixed_matrix_datasets:
@@ -506,6 +515,11 @@ def objective_iterative_rewiring(
     dropout_p_sel = trial.suggest_float('dropout_p_selective', dropout_selective_range[0], dropout_selective_range[1])
     model_lr_sel = trial.suggest_float('model_lr_selective', lr_selective_range[0], lr_selective_range[1], log=True)
     wd_sel = trial.suggest_float('weight_decay_selective', wd_selective_range[0], wd_selective_range[1], log=True)
+    
+    # Sample parameters for SGC
+    sgc_K = trial.suggest_categorical('sgc_K', sgc_K_options) 
+    sgc_lr = trial.suggest_float('sgc_lr', sgc_lr_range[0], sgc_lr_range[1], log=True)
+    sgc_wd = trial.suggest_float('sgc_wd', sgc_wd_range[0], sgc_wd_range[1], log=True)
 
     # Run rewiring experiment with iterative approach
     stats_dict, results_list = run_iterative_bridge_experiment(
@@ -536,8 +550,10 @@ def objective_iterative_rewiring(
         do_self_loop=do_self_loop,
         do_residual_connections=do_residual_connections,
         use_sgc=use_sgc,
-        n_rewire=n_rewire_iterations,
-        K=sgc_k
+        n_rewire=n_rewire,
+        sgc_K=sgc_K,
+        sgc_lr=sgc_lr,
+        sgc_wd=sgc_wd
     )
 
     # Store the permutation matrix used
@@ -564,8 +580,10 @@ def objective_iterative_rewiring(
     trial.set_user_attr('rewired_stats', rewired_stats)
     
     # Store iterative rewiring specific information
-    trial.set_user_attr('n_rewire_iterations', n_rewire_iterations)
+    trial.set_user_attr('n_rewire_iterations', n_rewire)
     trial.set_user_attr('use_sgc', use_sgc)
-    trial.set_user_attr('sgc_k', sgc_k)
+    trial.set_user_attr('sgc_K', sgc_K)
+    trial.set_user_attr('sgc_lr', sgc_lr)
+    trial.set_user_attr('sgc_wd', sgc_wd)
     
     return -stats_dict['val_acc_mean']  # Minimize negative validation accuracy

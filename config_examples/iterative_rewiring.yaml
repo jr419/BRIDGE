@@ -2,29 +2,32 @@
 
 # Experiment type and name
 experiment_type: "rewiring"
-experiment_name: "test_iterative_rewiring_experiment"
+experiment_name: "iterative_selective_rewiring_with_hyperparams_full"
 
 # General settings
 seed: 42
 device: "cuda"
-num_trials: 5
-num_splits: 3
+num_trials: 100
+num_splits: 10
 early_stopping: 50
 
 # Model settings
 do_hp: false                  # Use high-pass filters
 do_self_loop: false          # Add self-loops to graphs
-do_residual: true            # Use residual connections in GCN
+do_residual: false            # Use residual connections in GCN
 
 # Dataset settings
 dataset_type: "standard"
 standard_datasets:
   - "cora"
+  - "actor"
   - "citeseer"
-  - "pubmed"
+  - "chameleon"
+  - "squirrel"
   - "wisconsin"
   - "cornell"
   - "texas"
+  - "pubmed"
 
 # Synthetic dataset parameters (used if dataset_type is "synthetic")
 # syn_nodes: 3000
@@ -37,6 +40,9 @@ standard_datasets:
 gcn_h_feats: [16, 32, 64, 128]
 gcn_n_layers: [1, 2, 3]
 gcn_dropout_range: [0.0, 0.7]
+gcn_wd_range: [1.0e-5, 0.1]
+gcn_lr_range: [1.0e-6, 1.0e-3]
+
 
 # Optimization parameters for rewiring
 temperature_range: [1.0e-5, 2.0]
@@ -52,9 +58,14 @@ wd_selective_range: [1.0e-6, 1.0e-3]
 
 # Iterative rewiring parameters
 use_iterative_rewiring: true     # Enable iterative rewiring approach
-n_rewire_iterations: 10          # Number of rewiring iterations
+n_rewire_iterations_range: [1, 20]
 use_sgc: true                    # Use SGC for faster rewiring
-sgc_k: 2                         # Number of propagation steps for SGC
+sgc_K_options: [1, 2, 3]
+lr_selective_range: [1.0e-5, 0.1]
+sgc_wd_range: [1.0e-6, 1.0e-3]
+
 
 # Symmetry checking
 check_symmetry: False             # Check and enforce graph symmetry
+
+
