@@ -487,8 +487,8 @@ Model & {header_columns} \\\\
 def main():
     # Define model folders - adjust these paths to your actual data locations
     model_folders = [
-        ('High-Pass GCN', 'results/rewiring/no_self_loop_yes_hp_fixed_n_layers_2025-03-20-09-32-06'),
-        ('Low-Pass GCN', 'results/rewiring/no_self_loop_no_hp_fixed_n_layers_2025-03-19-09-53-28')
+        #('High-Pass GCN', 'results/rewiring/no_self_loop_yes_hp_fixed_n_layers_2025-03-20-09-32-06'),
+        ('Low-Pass GCN', 'results/rewiring/large_run_no_hp_2025-05-07-14-01-06')
     ]
     
     # Parse results for each folder
