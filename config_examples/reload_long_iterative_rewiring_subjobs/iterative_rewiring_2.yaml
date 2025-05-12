@@ -67,6 +67,12 @@ sgc_wd_range: [1.0e-6, 1.0e-3]
 
 
 # Symmetry checking
-check_symmetry: True             # Check and enforce graph symmetry
+check_symmetry: True             # Check and enforce graph symmetry 
+
+# Study loading settings
+load_study_settings:
+  load_study: "rewiring/full_actor_2025-05-09-11-07-41/gcn_study.db"
+  study_name: "rewiring-actor-2025-05-09-11-07-41"
+  continue_trials: 35 
 
 

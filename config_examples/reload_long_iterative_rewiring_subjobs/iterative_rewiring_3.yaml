@@ -73,6 +73,6 @@ check_symmetry: True             # Check and enforce graph symmetry
 load_study_settings:
   load_study: "rewiring/full_citeseer_2025-05-09-23-14-09/gcn_study.db"
   study_name: "rewiring-citeseer-2025-05-09-23-14-09"
-  continue_trials: 43  # Run 200 more trials with refined search space
+  continue_trials: 43 
 
 

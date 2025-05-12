@@ -73,6 +73,6 @@ check_symmetry: True             # Check and enforce graph symmetry
 load_study_settings:
   load_study: "rewiring/full_cora_2025-05-09-11-07-41/gcn_study.db"
   study_name: "rewiring-cora-2025-05-09-11-07-41"
-  continue_trials: 42  # Run 200 more trials with refined search space
+  continue_trials: 42
 
 
