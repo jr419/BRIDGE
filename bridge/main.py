@@ -111,6 +111,14 @@ def parse_args():
     # Symmetry checking
     parser.add_argument('--check_symmetry', action='store_false', help='Check and enforce graph symmetry')
     
+    # Add to parse_args function in bridge/main.py
+    parser.add_argument('--load_study', type=str, default=None, 
+                        help='Path to a previous study database to load and continue')
+    parser.add_argument('--study_name', type=str, default=None,
+                        help='Name of the study to load from the database')
+    parser.add_argument('--continue_trials', type=int, default=300,
+                        help='Number of additional trials to run when continuing a study')
+
     return parser.parse_args()
 
 
@@ -168,6 +176,16 @@ def update_args_from_config(args, config):
             # Check if this argument was explicitly provided on the command line
             if args_dict[key] == default_args_dict[key]:  # If it's still the default value
                 args_dict[key] = value
+        
+        # Special handling for study loading parameters
+        if key == 'load_study_settings' and isinstance(value, dict):
+            # These settings are only in the config file, not command line
+            if value.get('load_study') and args_dict.get('load_study') is None:
+                args_dict['load_study'] = value.get('load_study')
+            if value.get('study_name') and args_dict.get('study_name') is None:
+                args_dict['study_name'] = value.get('study_name')
+            if value.get('continue_trials') and args_dict.get('continue_trials') == default_args_dict.get('continue_trials'):
+                args_dict['continue_trials'] = value.get('continue_trials')
     
     return argparse.Namespace(**args_dict)
 
@@ -401,14 +419,55 @@ def run_rewiring_experiment(args):
                         )
                 
                 # Create and run study for rewiring optimization
-                rewiring_study = optuna.create_study(
-                    study_name=rewiring_study_name,
-                    storage=f"sqlite:///{results_dir}/gcn_study.db",
-                    direction='minimize',
-                    load_if_exists=True
-                )
-                
-                rewiring_study.optimize(rewiring_objective, n_trials=args.num_trials)
+                if args.load_study and os.path.exists(args.load_study):
+                    print(f"\nLoading previous study from {args.load_study}")
+                    
+                    # Determine study name to load
+                    study_name_to_load = args.study_name
+                    if study_name_to_load is None:
+                        # If no specific study name provided, try to find one matching the dataset
+                        study_name_to_load = f"rewiring-{dataset_name}"
+                        print(f"No study name provided, trying to load '{study_name_to_load}'")
+                    
+                    try:
+                        # Create the study by loading from previous storage
+                        rewiring_study = optuna.load_study(
+                            study_name=study_name_to_load,
+                            storage=f"sqlite:///{args.load_study}",
+                        )
+                        
+                        print(f"Successfully loaded study with {len(rewiring_study.trials)} previous trials")
+                        print(f"Best previous value: {-rewiring_study.best_value} validation accuracy")
+                        
+                        # Set the number of trials to the specified continue_trials value
+                        num_trials = args.continue_trials
+                        
+                    except (KeyError, Exception) as e:
+                        print(f"Error loading study: {e}")
+                        print("Creating a new study instead")
+                        
+                        # Create a new study as before
+                        rewiring_study = optuna.create_study(
+                            study_name=rewiring_study_name,
+                            storage=f"sqlite:///{results_dir}/gcn_study.db",
+                            direction='minimize',
+                            load_if_exists=True
+                        )
+                        
+                        num_trials = args.num_trials
+                else:
+                    # Create a new study as before
+                    rewiring_study = optuna.create_study(
+                        study_name=rewiring_study_name,
+                        storage=f"sqlite:///{results_dir}/gcn_study.db",
+                        direction='minimize',
+                        load_if_exists=True
+                    )
+                    
+                    num_trials = args.num_trials
+
+                # Use the determined number of trials
+                rewiring_study.optimize(rewiring_objective, n_trials=num_trials)
                 
                 # Get best rewiring parameters
                 best_rewiring_params = rewiring_study.best_params
