@@ -9,7 +9,7 @@ import torch
 import dgl
 import numpy as np
 import optuna
-from typing import Tuple, List, Dict, Union, Optional, Any
+from typing import Tuple, List, Dict, Union, Optional, Any, Callable
 from tqdm import trange
 from scipy import stats
 
@@ -17,6 +17,81 @@ from ..models import GCN
 from ..training import train, get_metric_type
 from ..utils import set_seed, compute_confidence_interval
 from ..rewiring import run_bridge_experiment, run_iterative_bridge_experiment
+
+
+# def trial_suggest_or_fixed(
+#     trial_suggest: Callable,
+#     hyperparameter_range: List[float],
+#     name: str) -> Any:
+
+#     """
+#     Function to sample a hyperparameter value from a given range or use a fixed value.
+#     Args:
+#         trial_suggest (function): Optuna trial suggest function
+#         hyperparameter_range: Range for the hyperparameter [min, max]
+#         name: Name of the hyperparameter
+    
+#     """
+#     if isinstance(hyperparameter_range, list) and hyperparameter_range[0] == hyperparameter_range[-1]:
+#         return hyperparameter_range[0]
+#     elif isinstance(hyperparameter_range, list) and len(hyperparameter_range) == 2:
+#         return trial_suggest(name, hyperparameter_range[0], hyperparameter_range[1])
+#     elif isinstance(hyperparameter_range, list):
+#         return trial_suggest(name, hyperparameter_range)
+#     else:
+#         raise ValueError(f"Invalid hyperparameter range or type for {name}: {hyperparameter_range}")
+
+def trial_suggest_or_fixed(
+    trial,
+    hyperparameter_range,
+    name,
+    param_type="float",  # "int", "float", or "categorical"
+    log_scale=False
+):
+    """
+    Function to sample a hyperparameter value or use a fixed value.
+    Fixed values are stored as trial user attributes rather than parameters.
+    
+    Args:
+        trial: Optuna trial object
+        hyperparameter_range: Range for the hyperparameter [min, max] or list of options
+        name: Name of the hyperparameter
+        param_type: Type of parameter ("int", "float", or "categorical")
+        log_scale: Whether to sample on log scale (for float parameters)
+    
+    Returns:
+        The sampled or fixed parameter value
+    """
+    # Fixed value case: single item list or range with equal min/max
+    if isinstance(hyperparameter_range, list):
+        if len(hyperparameter_range) == 1:
+            # Set fixed value as a user attribute, not a parameter
+            value = hyperparameter_range[0]
+            trial.set_user_attr(name, value)
+            return value
+        elif len(hyperparameter_range) == 2 and hyperparameter_range[0] == hyperparameter_range[1]:
+            # Set fixed value as a user attribute, not a parameter
+            value = hyperparameter_range[0]
+            trial.set_user_attr(name, value)
+            return value
+        # Range case: min and max are different
+        elif len(hyperparameter_range) == 2 and param_type != "categorical":
+            if param_type == "int":
+                return trial.suggest_int(name, hyperparameter_range[0], hyperparameter_range[1])
+            elif param_type == "float":
+                return trial.suggest_float(name, hyperparameter_range[0], hyperparameter_range[1], log=log_scale)
+            else:
+                raise ValueError(f"Invalid param_type '{param_type}' for range parameter")
+        # Categorical options case: either explicitly categorical or list with more than 2 items
+        else:
+            return trial.suggest_categorical(name, hyperparameter_range)
+    # Handle non-list inputs (like single values)
+    else:
+        # Set fixed value as a user attribute, not a parameter
+        value = hyperparameter_range
+        trial.set_user_attr(name, value)
+        return value
+
 
 
 def train_and_evaluate_gcn(
@@ -129,17 +204,17 @@ def train_and_evaluate_gcn(
     mean_test = np.mean(test_accs)
 
     # Calculate 95% confidence intervals
-    def get_confidence_interval(data: List[float]) -> Tuple[float, float]:
-        confidence = 0.95
-        data = np.array(data)
-        n = len(data)
-        se = stats.sem(data)
-        ci = stats.t.interval(confidence, n-1, loc=np.mean(data), scale=se)
-        return ci
+    # def get_confidence_interval(data: List[float]) -> Tuple[float, float]:
+    #     confidence = 0.95
+    #     data = np.array(data)
+    #     n = len(data)
+    #     se = stats.sem(data)
+    #     ci = stats.t.interval(confidence, n-1, loc=np.mean(data), scale=se)
+    #     return ci
 
-    train_ci = get_confidence_interval(train_accs)
-    val_ci = get_confidence_interval(val_accs)
-    test_ci = get_confidence_interval(test_accs)
+    train_ci = compute_confidence_interval(train_accs, confidence=0.95)
+    val_ci = compute_confidence_interval(val_accs, confidence=0.95)
+    test_ci = compute_confidence_interval(test_accs, confidence=0.95)
 
     return (
         mean_train,
@@ -326,7 +401,7 @@ def objective_rewiring(
     wd_selective_range = wd_selective_range or [1e-6, 1e-3]
     
     # Sample hyperparameters (including the permutation matrix index)
-    fixed_matrix_datasets = ["cora", "citeseer", "pubmed"]
+    fixed_matrix_datasets = ["cora", "citeseer"]
     
     if dataset_name.lower() in fixed_matrix_datasets:
         matrix_idx = 0
@@ -335,7 +410,6 @@ def objective_rewiring(
     
     p_add = trial.suggest_float('p_add', p_add_range[0], p_add_range[1])
     p_remove = trial.suggest_float('p_remove', p_remove_range[0], p_remove_range[1])
-    print(temperature_range)
     temperature = trial.suggest_float('temperature', temperature_range[0], temperature_range[1])
     d_out = trial.suggest_float('d_out', 10, np.sqrt(g.number_of_nodes()))
 
@@ -492,18 +566,60 @@ def objective_iterative_rewiring(
     
     # Sample hyperparameters
     # Add n_rewire_iterations as a hyperparameter to optimize
-    n_rewire = trial.suggest_int('n_rewire_iterations', n_rewire_iterations_range[0], n_rewire_iterations_range[1])
-    fixed_matrix_datasets = ["cora", "citeseer", "pubmed"]
+    n_rewire = trial_suggest_or_fixed(
+        trial,
+        n_rewire_iterations_range,
+        'n_rewire_iterations',
+        param_type="int"
+    )
+    #n_rewire = trial.suggest_int('n_rewire_iterations', n_rewire_iterations_range[0], n_rewire_iterations_range[1])
+    fixed_matrix_datasets = ["cora", "citeseer"]
     
     if dataset_name.lower() in fixed_matrix_datasets:
-        matrix_idx = 0
+        matrix_idx = trial_suggest_or_fixed(
+            trial,
+            [0,0],
+            'matrix_idx',
+            param_type="int"
+        )
     else:
-        matrix_idx = trial.suggest_int('matrix_idx', 0, (len(all_matrices)-1)) 
+        matrix_idx = trial_suggest_or_fixed(
+            trial,
+            [0,(len(all_matrices)-1)],
+            'matrix_idx',
+            param_type="int"
+        )
     
-    p_add = trial.suggest_float('p_add', p_add_range[0], p_add_range[1])
-    p_remove = trial.suggest_float('p_remove', p_remove_range[0], p_remove_range[1])
-    temperature = trial.suggest_float('temperature', temperature_range[0], temperature_range[1])
-    d_out = trial.suggest_float('d_out', 10, np.sqrt(g.number_of_nodes()))
+    p_add =  trial_suggest_or_fixed(
+        trial,
+        p_add_range,
+        'p_add',
+        param_type="float"
+    )
+    p_remove =  trial_suggest_or_fixed(
+        trial,
+        p_remove_range,
+        'p_remove',
+        param_type="float"
+    )
+    temperature =  trial_suggest_or_fixed(
+        trial,
+        temperature_range,
+        'temperature',
+        param_type="float"
+    )
+    d_out = trial_suggest_or_fixed(
+        trial,
+        [10, np.sqrt(g.number_of_nodes())],
+        'd_out',
+        param_type="float"
+    )
+
+    # matrix_idx = trial.suggest_int('matrix_idx', 0, (len(all_matrices)-1))
+    # p_add = trial.suggest_float('p_add', p_add_range[0], p_add_range[1])
+    # p_remove = trial.suggest_float('p_remove', p_remove_range[0], p_remove_range[1])
+    # temperature = trial.suggest_float('temperature', temperature_range[0], temperature_range[1])
+    # d_out = trial.suggest_float('d_out', 10, np.sqrt(g.number_of_nodes()))
 
     P_k = all_matrices[matrix_idx]
     num_graphs = 1
@@ -516,16 +632,71 @@ def objective_iterative_rewiring(
     wd_gcn = best_gcn_params['weight_decay']
 
     # Sample parameters for selective GCN
-    h_feats_sel = trial.suggest_categorical('h_feats_selective', h_feats_selective_options)
-    n_layers_sel = trial.suggest_categorical('n_layers_selective', n_layers_selective_options)
-    dropout_p_sel = trial.suggest_float('dropout_p_selective', dropout_selective_range[0], dropout_selective_range[1])
-    model_lr_sel = trial.suggest_float('model_lr_selective', lr_selective_range[0], lr_selective_range[1], log=True)
-    wd_sel = trial.suggest_float('weight_decay_selective', wd_selective_range[0], wd_selective_range[1], log=True)
+    h_feats_sel = trial_suggest_or_fixed(
+        trial,
+        h_feats_selective_options,
+        'h_feats_selective',
+        param_type="categorical"
+    )
+    n_layers_sel = trial_suggest_or_fixed(
+        trial,
+        n_layers_selective_options,
+        'n_layers_selective',
+        param_type="categorical"
+    )
+    dropout_p_sel = trial_suggest_or_fixed(
+        trial,
+        dropout_selective_range,
+        'dropout_p_selective',
+        param_type="float"
+    )
+    model_lr_sel = trial_suggest_or_fixed(
+        trial,
+        lr_selective_range,
+        'model_lr_selective',
+        param_type="float",
+        log_scale=True
+    )
+    wd_sel = trial_suggest_or_fixed(
+        trial,
+        wd_selective_range,
+        'weight_decay_selective',
+        param_type="float",
+        log_scale=True
+    )
+
+    # h_feats_sel = trial.suggest_categorical('h_feats_selective', h_feats_selective_options)
+    # n_layers_sel = trial.suggest_categorical('n_layers_selective', n_layers_selective_options)
+    # dropout_p_sel = trial.suggest_float('dropout_p_selective', dropout_selective_range[0], dropout_selective_range[1])
+    # model_lr_sel = trial.suggest_float('model_lr_selective', lr_selective_range[0], lr_selective_range[1], log=True)
+    # wd_sel = trial.suggest_float('weight_decay_selective', wd_selective_range[0], wd_selective_range[1], log=True)
     
     # Sample parameters for SGC
-    sgc_K = trial.suggest_categorical('sgc_K', sgc_K_options) 
-    sgc_lr = trial.suggest_float('sgc_lr', sgc_lr_range[0], sgc_lr_range[1], log=True)
-    sgc_wd = trial.suggest_float('sgc_wd', sgc_wd_range[0], sgc_wd_range[1], log=True)
+    sgc_K = trial_suggest_or_fixed(
+        trial,
+        sgc_K_options,
+        'sgc_K',
+        param_type="categorical"
+    )
+    sgc_lr = trial_suggest_or_fixed(
+        trial,
+        sgc_lr_range,
+        'sgc_lr',
+        param_type="float",
+        log_scale=True
+    )
+
+    
+    sgc_wd = trial_suggest_or_fixed(
+        trial,
+        sgc_wd_range,
+        'sgc_wd',
+        param_type="float",
+        log_scale=True
+    )
+    #trial.suggest_categorical('sgc_K', sgc_K_options) 
+    #trial.suggest_float('sgc_lr', sgc_lr_range[0], sgc_lr_range[1], log=True)
+    #trial.suggest_float('sgc_wd', sgc_wd_range[0], sgc_wd_range[1], log=True)
 
     # Run rewiring experiment with iterative approach
     stats_dict, results_list = run_iterative_bridge_experiment(

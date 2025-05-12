@@ -412,15 +412,18 @@ def run_rewiring_experiment(args):
                 
                 # Get best rewiring parameters
                 best_rewiring_params = rewiring_study.best_params
+                best_rewiring_attributes = rewiring_study.best_trial.user_attrs
                 print("\nBest rewiring parameters:", best_rewiring_params)
+                print("Best rewiring attributes:", best_rewiring_attributes)
+                print("Best rewiring validation accuracy:", -rewiring_study.best_value)
                 
                 # Apply best rewiring strategy to the graph
-                matrix_idx = best_rewiring_params.get('matrix_idx', 0)
+                matrix_idx = best_rewiring_params.get('matrix_idx', best_rewiring_attributes.get('matrix_idx'))
                 P_k = all_matrices[matrix_idx]
-                p_add = best_rewiring_params.get('p_add')
-                p_remove = best_rewiring_params.get('p_remove')
-                temperature = best_rewiring_params.get('temperature')
-                d_out = best_rewiring_params.get('d_out')
+                p_add = best_rewiring_params.get('p_add', best_rewiring_attributes.get('p_add'))
+                p_remove = best_rewiring_params.get('p_remove', best_rewiring_attributes.get('p_remove'))
+                temperature = best_rewiring_params.get('temperature', best_rewiring_attributes.get('temperature'))
+                d_out = best_rewiring_params.get('d_out', best_rewiring_attributes.get('d_out'))
                 
                 # Select GCN hyperparameters
                 h_feats_gcn = best_gcn_params['h_feats']
@@ -430,17 +433,17 @@ def run_rewiring_experiment(args):
                 wd_gcn = best_gcn_params['weight_decay']
                 
                 # Select selective GCN hyperparameters
-                h_feats_sel = best_rewiring_params.get('h_feats_selective')
-                n_layers_sel = best_rewiring_params.get('n_layers_selective')
-                dropout_p_sel = best_rewiring_params.get('dropout_p_selective')
-                model_lr_sel = best_rewiring_params.get('model_lr_selective')
-                wd_sel = best_rewiring_params.get('weight_decay_selective')
-                n_rewire_iterations = best_rewiring_params.get('n_rewire_iterations', 1)
+                h_feats_sel = best_rewiring_params.get('h_feats_selective', best_rewiring_attributes.get('h_feats_selective'))
+                n_layers_sel = best_rewiring_params.get('n_layers_selective', best_rewiring_attributes.get('n_layers_selective'))
+                dropout_p_sel = best_rewiring_params.get('dropout_p_selective', best_rewiring_attributes.get('dropout_p_selective'))
+                model_lr_sel = best_rewiring_params.get('model_lr_selective', best_rewiring_attributes.get('model_lr_selective'))
+                wd_sel = best_rewiring_params.get('weight_decay_selective', best_rewiring_attributes.get('weight_decay_selective'))
+                n_rewire_iterations = best_rewiring_params.get('n_rewire_iterations', best_rewiring_attributes.get('n_rewire_iterations'))
 
                 if args.use_iterative_rewiring:
-                    sgc_K = best_rewiring_params.get('sgc_K')
-                    sgc_wd = best_rewiring_params.get('sgc_wd')
-                    sgc_lr = best_rewiring_params.get('sgc_lr')
+                    sgc_K = best_rewiring_params.get('sgc_K', best_rewiring_attributes.get('sgc_K'))
+                    sgc_wd = best_rewiring_params.get('sgc_wd', best_rewiring_attributes.get('sgc_wd'))
+                    sgc_lr = best_rewiring_params.get('sgc_lr', best_rewiring_attributes.get('sgc_lr'))
                 
                 # Run final experiment with best parameters
 
