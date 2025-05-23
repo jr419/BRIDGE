@@ -20,19 +20,12 @@ do_residual: false            # Use residual connections in GCN
 # Dataset settings
 dataset_type: "standard"
 standard_datasets:
-  - "cora"
-  - "actor"
-  - "citeseer"
-  - "chameleon"
-  - "squirrel"
-  - "wisconsin"
-  - "cornell"
-  - "texas"
-  - "pubmed"
+  - "chameleon_filtered"
+  - "squirrel_filtered"
 
 # Synthetic dataset parameters (used if dataset_type is "synthetic")
 # syn_nodes: 3000
-# syn_classes: 5
+# syn_classes: 4
 # syn_homophily: 0.5
 # syn_degree: 20
 # syn_features: 5

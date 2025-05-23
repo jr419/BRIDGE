@@ -1,17 +1,23 @@
 
 \begin{table}[htbp]
 \centering
-\caption{Model Performance Before and After Rewiring (Cora, Citeseer, Pubmed)}
+\caption{Model Performance Before and After Rewiring}
 \label{tab:accuracies}
-\makebox[\textwidth]{\begin{tabular}{lccc}
+\makebox[\textwidth]{\begin{tabular}{lcccccc}
 \toprule
-Model & Cora & Citeseer & Pubmed \\
+Model & Cora & Citeseer & Pubmed & Actor & Squirrel & Chameleon \\
 \midrule
-High-Pass GCN (Base) & 79.30 ± 0.34 & 68.82 ± 0.20 & -- \\
-High-Pass GCN (Rewired) & 79.34 ± 0.47 & \textbf{69.34 ± 0.29} & -- \\
+Single Rewiring (Base) & 86.85 ± 0.33 & 75.15 ± 0.42 & -- & 26.16 ± 0.26 & 57.84 ± 0.56 & 73.46 ± 0.73 \\
+Single Rewiring (Rewired) & 86.97 ± 0.36 & 74.86 ± 0.39 & -- & 25.98 ± 0.30 & \textcolor{purple}{58.32 ± 0.54} & 73.79 ± 0.68 \\
 \midrule
-Low-Pass GCN (Base) & 78.08 ± 0.12 & 69.00 ± 0.75 & -- \\
-Low-Pass GCN (Rewired) & \textbf{79.20 ± 0.40} & 69.80 ± 0.72 & -- \\
+Short Rewiring (Base) & 87.69 ± 1.11 & 74.16 ± 1.79 & -- & 26.06 ± 1.09 & 60.46 ± 2.02 & 70.68 ± 2.82 \\
+Short Rewiring (Rewired) & 88.39 ± 1.41 & \textcolor{purple}{75.60 ± 1.27} & -- & \textcolor{blue}{26.74 ± 0.79} & 60.45 ± 1.65 & 71.12 ± 2.35 \\
+\midrule
+Iterative Rewiring (Base) & 87.32 ± 1.11 & 74.56 ± 1.55 & -- & 26.01 ± 1.33 & 58.20 ± 1.48 & 73.27 ± -0.99 \\
+Iterative Rewiring (Rewired) & \textcolor{blue}{88.10 ± 1.20} & \textcolor{blue}{75.69 ± 1.50} & -- & \textcolor{red}{27.72 ± 1.08} & 53.86 ± 1.41 & 65.48 ± 1.84 \\
+\midrule
+Full Block Rewiring (Base) & 87.79 ± -0.48 & 74.14 ± -0.81 & -- & 26.06 ± -0.54 & 59.57 ± -0.79 & 72.98 ± -1.02 \\
+Full Block Rewiring (Rewired) & 87.14 ± 1.13 & \textcolor{purple}{76.07 ± 2.19} & -- & \textcolor{red}{28.59 ± 0.89} & 57.11 ± 1.85 & 70.66 ± 2.35 \\
 \midrule
 \bottomrule
 \end{tabular}}

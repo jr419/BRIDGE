@@ -260,8 +260,8 @@ def run_sensitivity_experiment(
     num_classes = len(torch.unique(labels))
     
     # Create train/test split if not present
-    if 'train_mask' not in graph.ndata or 'test_mask' not in graph.ndata:
-        create_train_test_split(graph)
+    #if 'train_mask' not in graph.ndata or 'test_mask' not in graph.ndata:
+    create_train_test_split(graph)
     
     train_mask = graph.ndata['train_mask']
     test_mask = graph.ndata['test_mask']

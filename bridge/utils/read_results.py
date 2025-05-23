@@ -343,8 +343,8 @@ from pathlib import Path
 # ------------------------------------------------------------------------------
 # Configuration
 # ------------------------------------------------------------------------------
-MAIN_DATASETS = ["cora", "citeseer", "pubmed"]
-OTHER_DATASETS = ['actor', 'squirrel', 'chameleon', 'wisconsin', 'cornell', 'texas']
+MAIN_DATASETS = ["cora", "citeseer", "pubmed",'actor', 'squirrel', 'chameleon']
+OTHER_DATASETS = ['wisconsin', 'cornell', 'texas']
 SYNTHETIC_DATASETS = [
     'synthetic_graph_dataset_h=0.10_d=20.00',
     'synthetic_graph_dataset_h=0.20_d=20.00',
@@ -355,46 +355,58 @@ SYNTHETIC_DATASETS = [
     'synthetic_graph_dataset_h=0.70_d=20.00'
 ]
 
-# ------------------------------------------------------------------------------
-# Helper to parse a single dataset's JSON file
-# ------------------------------------------------------------------------------
+import os
+import json
+import math
+from pathlib import Path
+from scipy.stats import t  # add this import
+
+# number of independent trials per condition
+N_TRIALS = 10
 def parse_single_dataset_results(json_path):
-    """
-    Reads a single JSON results file and returns a dict with:
-      {
-        'base_acc': float,
-        'base_err': float,
-        'rewired_acc': float,
-        'rewired_err': float
-      }
-    """
     with open(json_path, "r") as f:
         data = json.load(f)
-    print(json_path)
-    print("=="*100)
-    # Extract the values
-    base_acc = 100 * data["base_gcn"]["test_accuracy"]
-    base_acc_ci = data["base_gcn"]["test_accuracy_ci"]
-    rewired_mean = 100 * data["rewiring"]["test_accuracy_mean"]
-    rewired_acc_ci = data["rewiring"]["test_accuracy_ci"]
 
-    # Calculate errors and divide by 10
-    base_err = 100 * (base_acc_ci[1] - base_acc_ci[0]) / 2.0 
-    rewired_err = 100 * (rewired_acc_ci[1] - rewired_acc_ci[0]) / 2.0
-    
-    # Check if improvement is significant
-    base_range = [base_acc - base_err, base_acc + base_err]
-    rewired_range = [rewired_mean - rewired_err, rewired_mean + rewired_err]
-    
-    # No overlap in ranges means significant difference
-    is_significant = not (base_range[1] >= rewired_range[0] and base_range[0] <= rewired_range[1])
-    
+    # means (as %)
+    base_mean    = 100 * data["base_gcn"]["test_accuracy"]
+    rewired_mean = 100 * data["rewiring"]["test_accuracy_mean"]
+
+    # CI endpoints
+    base_low, base_high       = data["base_gcn"]["test_accuracy_ci"]
+    rewired_low, rewired_high = data["rewiring"]["test_accuracy_ci"]
+
+    # half‐ranges of the 95% CI
+    base_half    = (base_high - base_low)       * 100 / 2.0
+    rewired_half = (rewired_high - rewired_low) * 100 / 2.0
+
+    # approximate sample std dev from CI: half_range = t_{0.975,df} * (s/√n)
+    df    = N_TRIALS - 1
+    tcrit = t.ppf(0.975, df)
+    s_base    = base_half    * math.sqrt(N_TRIALS) / tcrit
+    s_rewired = rewired_half * math.sqrt(N_TRIALS) / tcrit
+
+    # Welch’s t‐statistic
+    se_diff  = math.sqrt(s_base**2/N_TRIALS + s_rewired**2/N_TRIALS)
+    t_stat   = (rewired_mean - base_mean) / se_diff
+
+    # Welch–Satterthwaite df
+    num   = (s_base**2/N_TRIALS + s_rewired**2/N_TRIALS)**2
+    denom = (
+        s_base**4   / ((N_TRIALS**2)*(N_TRIALS-1))
+      + s_rewired**4/ ((N_TRIALS**2)*(N_TRIALS-1))
+    )
+    df_welch = num / denom
+
+    # one‐sided p‐value (rewired > base)
+    p_value = 1 - t.cdf(t_stat, df_welch)
+
     return {
-        "base_acc": base_acc,
-        "base_err": base_err,
-        "rewired_acc": rewired_mean,
-        "rewired_err": rewired_err,
-        "is_significant": is_significant
+        "base_acc":       base_mean,
+        "base_err":       s_base,
+        "rewired_acc":    rewired_mean,
+        "rewired_err":    s_rewired,
+        "p_value":        p_value,
+        "is_significant": (p_value < 0.1 and t_stat > 0)
     }
 
 # ------------------------------------------------------------------------------
@@ -417,16 +429,52 @@ def parse_results_for_model(folder_path):
 # ------------------------------------------------------------------------------
 # Build LaTeX tables
 # ------------------------------------------------------------------------------
-def format_value(value, error, is_significant):
-    """Format value ± error, with bolding if significant"""
-    if math.isnan(value) or value is None:
+# ---------------------------------------------------------------------
+# NEW: map p-value to LaTeX colour
+# ---------------------------------------------------------------------
+def p_to_colour(p):
+    """
+    Blue   : 0.10 > p ≥ 0.05
+    Purple : 0.05 > p ≥ 0.01
+    Red    : 0.01 > p
+    None   : p ≥ 0.10   (no colouring)
+    """
+    if p is None:
+        return None
+    if p < 0.01:
+        return "red"
+    elif p < 0.05:
+        return "purple"           # xcolor’s 'purple'
+    elif p < 0.10:
+        return "blue"
+    return None
+
+# ---------------------------------------------------------------------
+# REPLACE the old `format_value` with this one
+# ---------------------------------------------------------------------
+def format_value(value, error, p_value=None, bold=False):
+    """
+    Build the “mean ± err” string, colour-coding with xcolor and (optionally)
+    bold-facing when a result is significant.
+    """
+    if value is None or math.isnan(value):
         return "--"
+
+    s = f"{value:.2f} ± {error:.2f}"
     
-    formatted = f"{value:.2f} ± {error:.2f}"
-    if is_significant:
-        formatted = f"\\textbf{{{formatted}}}"
+    # colour by p-value threshold
+    colour = p_to_colour(p_value)
+    if colour:
+        s = f"\\textcolor{{{colour}}}{{{s}}}"
     
-    return formatted
+    # bold if you still want to highlight p < 0.05
+    if bold:
+        s = f"\\textbf{{{s}}}"
+    
+    return s
+# ------------------------------------------------------------------------------
+# Build a LaTeX table for the given datasets
+# ------------------------------------------------------------------------------
 
 def build_table(models_data, dataset_list, caption, label, columns):
     """Build a LaTeX table for the given datasets"""
@@ -452,17 +500,23 @@ Model & {header_columns} \\\\
         for dataset in dataset_list:
             entry = model_data.get(dataset, {})
             if entry:
-                base_row.append(format_value(
-                    entry.get("base_acc"), 
-                    entry.get("base_err", 0), 
-                    False  # Base values are never bolded
-                ))
-                
-                rewired_row.append(format_value(
-                    entry.get("rewired_acc"), 
-                    entry.get("rewired_err", 0), 
-                    entry.get("is_significant", False)
-                ))
+                # ----- Base (never coloured) -----
+                base_row.append(
+                    format_value(
+                        entry.get("base_acc"),
+                        entry.get("base_err")
+                    )
+                )
+
+                # ----- Rewired (colour & bold) -----
+                rewired_row.append(
+                    format_value(
+                        entry.get("rewired_acc"),
+                        entry.get("rewired_err"),
+                        p_value = entry.get("p_value"),
+                        #bold    = entry.get("p_value", 1) < 0.05  # bold when significant
+                    )
+                )
             else:
                 base_row.append("--")
                 rewired_row.append("--")
@@ -488,7 +542,10 @@ def main():
     # Define model folders - adjust these paths to your actual data locations
     model_folders = [
         #('High-Pass GCN', 'results/rewiring/no_self_loop_yes_hp_fixed_n_layers_2025-03-20-09-32-06'),
-        ('Low-Pass GCN', 'results/rewiring/large_run_no_hp_2025-05-07-14-01-06')
+        ('Single Rewiring', 'results/rewiring/large_run_no_hp_2025-05-07-14-01-06'),
+        ('Short Rewiring', 'results/rewiring/incremental_iterative_selective_rewiring_full_2025-05-02-13-04-15'),
+        ('Iterative Rewiring', 'results/rewiring/long_rewiring_download'),
+        ('Full Block Rewiring', 'results/rewiring/full_block_rewiring_2025-05-12-14-11-54')
     ]
     
     # Parse results for each folder
@@ -500,9 +557,9 @@ def main():
     main_table = build_table(
         models_data,
         MAIN_DATASETS,
-        "Model Performance Before and After Rewiring (Cora, Citeseer, Pubmed)",
+        "Model Performance Before and After Rewiring",
         "tab:accuracies",
-        ["Cora", "Citeseer", "Pubmed"]
+        ["Cora", "Citeseer", "Pubmed", "Actor", "Squirrel", "Chameleon"]
     )
     
     other_table = build_table(

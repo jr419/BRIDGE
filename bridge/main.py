@@ -20,7 +20,7 @@ from typing import List, Dict, Any
 
 # Use absolute imports
 
-from bridge.utils.dataset_processing import add_train_val_test_splits
+from bridge.utils.dataset_processing import add_train_val_test_splits, load_filtered_heterophily
 from bridge.utils import set_seed, generate_all_symmetric_permutation_matrices, check_symmetry
 from bridge.optimization import objective_gcn, objective_rewiring, objective_iterative_rewiring, train_and_evaluate_gcn
 from bridge.datasets import SyntheticGraphDataset
@@ -236,10 +236,13 @@ def run_rewiring_experiment(args):
                     datasets.append(dgl.data.PubmedGraphDataset(force_reload=True))
                 elif dataset_name.lower() == 'actor':
                     datasets.append(dgl.data.ActorDataset(force_reload=True))
+                elif dataset_name.lower() in ('chameleon_filtered', 'squirrel_filtered'):
+                    datasets.append(load_filtered_heterophily(dataset_name.lower()))
                 elif dataset_name.lower() == 'chameleon':
                     datasets.append(dgl.data.ChameleonDataset(force_reload=True))
                 elif dataset_name.lower() == 'squirrel':
                     datasets.append(dgl.data.SquirrelDataset(force_reload=True))
+
                 elif dataset_name.lower() == 'wisconsin':
                     datasets.append(dgl.data.WisconsinDataset(force_reload=True))
                 elif dataset_name.lower() == 'cornell':
@@ -264,10 +267,10 @@ def run_rewiring_experiment(args):
                 k=args.syn_classes,
                 h=h,
                 d_mean=args.syn_degree,
-                sigma_intra_scalar=0.1,
-                sigma_inter_scalar=-0.05,
-                tau_scalar=1,
-                eta_scalar=1,
+                sigma_intra_scalar=1e-2,
+                sigma_inter_scalar=0.0,
+                tau_scalar=1e-2,
+                eta_scalar=1e-2,
                 in_feats=args.syn_features
             ))
     
@@ -301,6 +304,9 @@ def run_rewiring_experiment(args):
                 print(f"\nDataset Statistics:")
                 print(f"Number of nodes: {g.num_nodes()}")
                 print(f"Number of edges: {g.num_edges()}")
+                print(f"Forward edges: {g.adjacency_matrix().to_dense().triu().sum()}")
+                print(f"Backward edges: {g.adjacency_matrix().to_dense().tril().sum()}")
+                print(f"Is symmetric: {check_symmetry(g)}")
                 print(f"Number of features: {g.ndata['feat'].shape[1]}")
                 print(f"Number of classes: {len(torch.unique(g.ndata['label']))}")
                 print(f"HP mode: {do_hp}")

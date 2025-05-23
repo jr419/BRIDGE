@@ -725,6 +725,8 @@ def run_iterative_bridge_pipeline(
         ########################################################################
 
         pi = Z_pred.cpu().numpy().sum(0) / n_nodes
+        #clip pi to avoid division by zero
+        pi = np.clip(pi, 1e-5, None)
         Pi_inv = np.diag(1/pi)
         B_opt = (d_out/k) * Pi_inv @ P_k @ Pi_inv
         B_opt_tensor = torch.tensor(B_opt, dtype=torch.float32, device=device)

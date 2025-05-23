@@ -143,11 +143,11 @@ class SyntheticGraphDataset(DGLDataset):
         labels = self.graph.ndata['label'].numpy()
 
         # Scale for covariance matrices.
-        scale = 1e-4
-        sigma_intra_np = self.sigma_intra_scalar * scale * np.eye(in_feats)
-        sigma_inter_np = self.sigma_inter_scalar * scale * np.eye(in_feats)
-        tau_np         = self.tau_scalar         * scale * np.eye(in_feats)
-        eta_np         = self.eta_scalar         * scale * np.eye(in_feats)
+        #scale = 1e-4
+        sigma_intra_np = self.sigma_intra_scalar * np.eye(in_feats)
+        sigma_inter_np = self.sigma_inter_scalar * np.eye(in_feats)
+        tau_np         = self.tau_scalar         * np.eye(in_feats)
+        eta_np         = self.eta_scalar         * np.eye(in_feats)
 
         # Generate features with shape (n, in_feats, num_mu_samples)
         X_repeats = SyntheticGraphDataset.generate_features(

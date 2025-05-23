@@ -1,0 +1,35 @@
+
+
+# BRIDGE sensitivity analysis configuration for homophily sweep experiment
+
+# Experiment metadata
+experiment_name: homophily_sweep_experiment
+experiment_type: sensitivity
+
+# Graph parameters
+num_nodes: 100
+num_classes: 2
+mean_degree: 20
+homophily_min: 0.1
+homophily_max: 0.9
+homophily_steps: 30
+
+# Feature parameters
+feature_dim: 5
+cov_scale: 1.0e-4
+intra_class_cov: 0.1
+inter_class_cov: -0.05
+global_cov: 1.0
+noise_cov: 1.0
+
+# Model parameters
+model_type: linear_gcn  # Options: linear_gcn, two_layer_gcn
+hidden_dim: 16
+learning_rate: 0.01
+weight_decay: 1.0e-3
+num_epochs: 1000
+
+# Experiment settings
+num_samples: 5              # Number of graph samples per homophily value
+num_acc_repeats: 1         # Number of training repetitions for accuracy estimation
+num_monte_carlo_samples: 5  # Number of samples for Monte Carlo SNR estimation
