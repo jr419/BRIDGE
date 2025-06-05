@@ -54,7 +54,7 @@ Here's a simple example to get started with the BRIDGE rewiring technique:
 import dgl
 import torch
 from bridge.models import GCN
-from bridge.rewiring import run_bridge_pipeline
+from bridge.rewiring import run_iterative_bridge_pipeline
 from bridge.utils import generate_all_symmetric_permutation_matrices
 
 # Load a dataset
@@ -66,8 +66,8 @@ k = len(torch.unique(g.ndata['label']))
 all_matrices = generate_all_symmetric_permutation_matrices(k)
 P_k = all_matrices[0]  # Choose the first permutation matrix
 
-# Run the rewiring pipeline
-results = run_bridge_pipeline(
+# Run the iterative rewiring pipeline
+results = run_iterative_bridge_pipeline(
     g=g,
     P_k=P_k,
     h_feats_gcn=64,
@@ -79,6 +79,7 @@ results = run_bridge_pipeline(
     dropout_p_selective=0.5,
     model_lr_selective=1e-3,
     num_graphs=1,
+    n_rewire=5,
     device='cuda' if torch.cuda.is_available() else 'cpu'
 )
 

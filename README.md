@@ -1,6 +1,6 @@
 # BRIDGE: Block Rewiring from Inference-Derived Graph Ensembles
 
-BRIDGE (Block Rewiring from Inference-Derived Graph Ensembles) is a novel graph rewiring technique that leverages Stochastic Block Models (SBMs) to create optimized graph structures for improved node classification. The repository implements the methods and experiments described in:
+BRIDGE (Block Rewiring from Inference-Derived Graph Ensembles) is a graph rewiring framework that leverages Stochastic Block Models (SBMs) to create optimised graph structures for improved node classification. The repository implements the methods and experiments described in:
 
 > **The Limits of MPNNs: How Homophilic Bottlenecks Restrict the Signal-to-Noise Ratio in Message Passing**  
 > *Jonathan Rubin, Sahil Loomba, Nick S. Jones*
@@ -27,6 +27,7 @@ This repository contains two main packages:
 
 - **Graph Rewiring**
   - SBM-based graph rewiring to optimize network structure
+  - Iterative rewiring with fast SGC-based predictions
   - Support for both homophilic and heterophilic settings
   - Selective GNN models that choose the best graph structure for each node
 
@@ -37,7 +38,7 @@ This repository contains two main packages:
 
 - **Sensitivity Analysis**
   - Signal, noise, and global sensitivity estimation
-  - SNR calculation using both Monte Carlo and analytical methods
+  - SNR calculation using Monte Carlo or theorem-based formulas
   - Node-level analysis of homophilic bottlenecks
 
 - **Optimization & Experiments**
@@ -59,7 +60,7 @@ pip install -e .
 import dgl
 import torch
 from bridge.models import GCN
-from bridge.rewiring import run_bridge_pipeline
+from bridge.rewiring import run_iterative_bridge_pipeline
 from bridge.utils import generate_all_symmetric_permutation_matrices
 
 # Load a dataset
@@ -71,8 +72,8 @@ k = len(torch.unique(g.ndata['label']))
 all_matrices = generate_all_symmetric_permutation_matrices(k)
 P_k = all_matrices[0]  # Choose the first permutation matrix
 
-# Run the rewiring pipeline
-results = run_bridge_pipeline(
+# Run the iterative rewiring pipeline (5 iterations)
+results = run_iterative_bridge_pipeline(
     g=g,
     P_k=P_k,
     h_feats_gcn=64,
@@ -84,6 +85,7 @@ results = run_bridge_pipeline(
     dropout_p_selective=0.5,
     model_lr_selective=1e-3,
     num_graphs=1,
+    n_rewire=5,
     device='cuda' if torch.cuda.is_available() else 'cpu'
 )
 
@@ -121,7 +123,7 @@ feature_params = {
 
 # Run experiment across multiple graphs with varying homophily
 results = run_sensitivity_experiment(
-    g, 
+    g,
     homophily_values=[0.1, 0.3, 0.5, 0.7, 0.9],
     feature_params=feature_params
 )
@@ -142,6 +144,13 @@ For synthetic datasets:
 
 ```bash
 python -m bridge.main --dataset_type synthetic --syn_homophily 0.3 --syn_nodes 3000 --syn_classes 4 --experiment_name synthetic_experiment
+```
+
+To use the iterative rewiring pipeline add `--use_iterative_rewiring`:
+
+```bash
+python -m bridge.main --dataset_type standard --standard_datasets cora \
+    --use_iterative_rewiring --num_trials 50 --experiment_name cora_iterative
 ```
 
 ## Configuration

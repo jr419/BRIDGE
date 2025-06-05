@@ -16,6 +16,8 @@ nav_order: 1
 
 ---
 
+The tables below show the results obtained with the iterative BRIDGE pipeline.
+
 ## Performance on Standard Benchmarks
 
 We evaluate the performance of BRIDGE on standard benchmark datasets, comparing the base GCN accuracy with the rewired graph accuracy.

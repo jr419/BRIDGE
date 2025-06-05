@@ -8,7 +8,7 @@ permalink: /
 # BRIDGE: Block Rewiring from Inference-Derived Graph Ensembles
 {: .fs-9 }
 
-A novel graph rewiring technique that leverages Stochastic Block Models (SBMs) to create optimized graph structures for improved node classification.
+Graph rewiring utilities and sensitivity analysis tools for modern graph neural networks.
 {: .fs-6 .fw-300 }
 
 [Get Started](getting-started.md){: .btn .btn-primary .fs-5 .mb-4 .mb-md-0 .mr-2 }
@@ -43,6 +43,7 @@ This repository contains two main packages:
 
 - **Graph Rewiring**
   - SBM-based graph rewiring to optimize network structure
+  - Iterative rewiring with SGC-based predictions
   - Support for both homophilic and heterophilic settings
   - Selective GNN models that choose the best graph structure for each node
 
@@ -53,7 +54,7 @@ This repository contains two main packages:
 
 - **Sensitivity Analysis**
   - Signal, noise, and global sensitivity estimation
-  - SNR calculation using both Monte Carlo and analytical methods
+  - SNR calculation via Monte Carlo or theorem-based formulas
   - Node-level analysis of homophilic bottlenecks
 
 - **Optimization & Experiments**
