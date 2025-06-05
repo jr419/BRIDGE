@@ -35,6 +35,13 @@ The CLI supports two primary experiment types:
 python -m bridge.main --experiment_type rewiring --dataset_type standard --standard_datasets cora citeseer --num_trials 100 --experiment_name my_experiment
 ```
 
+To use the iterative algorithm:
+
+```bash
+python -m bridge.main --experiment_type rewiring --standard_datasets cora \
+    --use_iterative_rewiring --num_trials 50 --experiment_name my_iterative_run
+```
+
 ### Sensitivity Analysis
 
 ```bash
@@ -143,6 +150,17 @@ Supported standard datasets include:
 --dropout_selective_range FLOAT FLOAT   Dropout range for selective GCN [min, max]
 --lr_selective_range FLOAT FLOAT        Learning rate range for selective GCN [min, max]
 --wd_selective_range FLOAT FLOAT        Weight decay range for selective GCN [min, max]
+```
+
+### Iterative Rewiring
+
+```bash
+--use_iterative_rewiring        Use the iterative rewiring pipeline
+--n_rewire_iterations_range INTEGER INTEGER   Range of rewiring iterations [min, max]
+--use_sgc                       Use SGC for fast predictions in the iterative pipeline
+--sgc_K_options INTEGER...      Options for SGC propagation steps
+--sgc_lr_range FLOAT FLOAT      Learning rate range for SGC
+--sgc_wd_range FLOAT FLOAT      Weight decay range for SGC
 ```
 
 ## Symmetry Checking
