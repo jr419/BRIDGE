@@ -141,4 +141,13 @@ print(f"Theorem-based SNR: {results['estimated_snr_theorem'].item():.4f}")
 print(f"Test Accuracy: {results['mean_test_acc']:.4f}")
 ```
 
+### Running from a Configuration File
+
+The script `bridge.sensitivity.run_experiment` provides a command-line interface
+for running the full analysis with a YAML or JSON config file:
+
+```bash
+python -m bridge.sensitivity.run_experiment --config config_examples/snr_analysis.yaml
+```
+
 For more details on available functionality, see the [Sensitivity API]({% link sensitivity/api-reference.md %}).

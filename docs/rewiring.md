@@ -33,7 +33,7 @@ The BRIDGE (Block Rewiring from Inference-Derived Graph Ensembles) rewiring algo
 
 ### Rewiring Pipeline
 
-The complete rewiring pipeline is implemented in the `run_bridge_pipeline` function. The key steps are formalized in the following algorithm:
+The standard rewiring pipeline is implemented in the `run_bridge_pipeline` function. An iterative variant using repeated rewiring steps is provided via `run_iterative_bridge_pipeline`. The key steps are formalized below:
 
 ```
 Algorithm: SBM Graph Rewiring
@@ -83,7 +83,7 @@ These parameters can be optimized using the `objective_rewiring` function provid
 ## Example Usage
 
 ```python
-from bridge.rewiring import run_bridge_pipeline
+from bridge.rewiring import run_iterative_bridge_pipeline
 from bridge.utils import generate_all_symmetric_permutation_matrices
 
 # Generate all possible symmetric permutation matrices for k classes
@@ -91,8 +91,8 @@ k = len(torch.unique(g.ndata['label']))
 all_matrices = generate_all_symmetric_permutation_matrices(k)
 P_k = all_matrices[0]  # Choose the first permutation matrix
 
-# Run the BRIDGE pipeline
-results = run_bridge_pipeline(
+# Run the iterative BRIDGE pipeline
+results = run_iterative_bridge_pipeline(
     g=g,
     P_k=P_k,
     h_feats_gcn=64,
@@ -108,6 +108,7 @@ results = run_bridge_pipeline(
     p_remove=0.1,
     d_out=10,
     num_graphs=1,
+    n_rewire=5,
     device='cuda'
 )
 ```

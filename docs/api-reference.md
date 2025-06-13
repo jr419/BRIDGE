@@ -37,6 +37,8 @@ The `rewiring` package contains functions for rewiring graph structures to optim
 
 - [run_bridge_pipeline](api-reference/bridge-pipeline.html): Main pipeline for running the BRIDGE rewiring process
 - [run_bridge_experiment](api-reference/bridge-experiment.html): Function for running multiple rewiring trials across data splits
+- [run_iterative_bridge_pipeline](api-reference/iterative-bridge-pipeline.html): Iterative rewiring pipeline
+- [run_iterative_bridge_experiment](api-reference/iterative-bridge-experiment.html): Repeated trials for iterative rewiring
 - [create_rewired_graph](api-reference/create-rewired-graph.html): Low-level function to create a rewired version of a graph
 
 ### bridge.training
@@ -66,6 +68,7 @@ The `optimization` package provides objective functions for hyperparameter optim
 
 - [objective_gcn](api-reference/objective-gcn.html): Objective function for optimizing base GCN hyperparameters
 - [objective_rewiring](api-reference/objective-rewiring.html): Objective function for optimizing rewiring parameters
+- [objective_iterative_rewiring](api-reference/objective-iterative-rewiring.html): Objective for iterative rewiring
 
 ### bridge.sensitivity
 
