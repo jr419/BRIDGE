@@ -19,7 +19,8 @@ def generate_features(
     intra_class_cov: np.ndarray, 
     global_cov: np.ndarray, 
     noise_cov: np.ndarray, 
-    mu_repeats: int = 1
+    mu_repeats: int = 1,
+    eps_gamma_repeats: int = 1
 ) -> np.ndarray:
     """
     Generate synthetic node features with controlled covariance structure.
@@ -40,6 +41,7 @@ def generate_features(
         global_cov: Covariance matrix for the global shift
         noise_cov: Covariance matrix for the node-specific noise
         mu_repeats: Number of feature realizations to generate for each class mean
+        eps_gamma_repeats: Number of noise realizations to generate for each node
         
     Returns:
         A numpy array of shape (num_nodes, num_features, mu_repeats)
@@ -63,36 +65,47 @@ def generate_features(
     # Sample concatenated class means and reshape
     mu_concatenated = np.random.multivariate_normal(
         mean=np.zeros(num_classes * num_features),
-        cov=mu_covariance
+        cov=mu_covariance,
+        size=mu_repeats
     )
-    mu_vectors = mu_concatenated.reshape(num_classes, num_features)
+    mu_vectors = mu_concatenated.reshape(
+        mu_repeats, num_classes, num_features
+    )  # shape: (mu_repeats, num_classes, num_features)
 
-    # 1) Generate global shift vectors for each repeat: shape (mu_repeats, num_features)
+    # 1) Generate global shift vectors for each repeat: shape (mu_repeats, eps_gamma_repeats, num_features)
     gamma_all = np.random.multivariate_normal(
         mean=np.zeros(num_features),
         cov=global_cov,
-        size=mu_repeats
+        size=(mu_repeats, eps_gamma_repeats)
     )
 
-    # 2) Generate node-specific noise for all nodes and repeats: shape (mu_repeats, num_nodes, num_features)
+    # 2) Generate node-specific noise for all nodes and repeats: shape (mu_repeats, eps_gamma_repeats, num_nodes, num_features)
     epsilon_all = np.random.multivariate_normal(
         mean=np.zeros(num_features),
         cov=noise_cov,
-        size=(mu_repeats, num_nodes)
+        size=(mu_repeats,eps_gamma_repeats, num_nodes)
     )
     
     # 3) Gather node-specific means and broadcast:
-    #    mu_vectors[labels] has shape (num_nodes, num_features).
-    mu_all = mu_vectors[labels]              # (num_nodes, num_features)
-    mu_all = mu_all[None, :, :]             # (1, num_nodes, num_features)
-    gamma_all = gamma_all[:, None, :]       # (mu_repeats, 1, num_features)
+    #    mu_vectors[:,labels] has shape (mu_repeats, num_nodes, num_features)
+    mu_all = mu_vectors[:,labels]              # shape: (mu_repeats, num_nodes, num_features)
+    mu_all = mu_all[:, None, :, :]            # (mu_repeats, 1, num_nodes, num_features)
+    
+    gamma_all = gamma_all[:, :, None, :]       # shape: (mu_repeats, eps_gamma_repeats, 1, num_features)
 
-    # 4) Sum them up: result has shape (mu_repeats, num_nodes, num_features)
-    X_all = mu_all + gamma_all + epsilon_all
+    # 4) Sum them up: result has shape (mu_repeats, eps_gamma_repeats, num_nodes, num_features)
+    X_all = mu_all + gamma_all + epsilon_all  # shape: (mu_repeats, eps_gamma_repeats, num_nodes, num_features)
 
-    # 5) Transpose to (num_nodes, num_features, mu_repeats)
-    X_repeats = np.transpose(X_all, (1, 2, 0))
-
+    # 5) Transpose to (num_nodes, num_features, mu_repeats, eps_gamma_repeats)
+    X_repeats = X_all.transpose(2, 3, 0, 1)  # shape: (num_nodes, num_features, mu_repeats, eps_gamma_repeats)
+    
+    if eps_gamma_repeats == 1:
+        # If we only have one eps_gamma sample, we can squeeze it out
+        X_repeats = X_repeats.squeeze(axis=3)
+    
+    # 6) Reshape to (num_nodes, num_features* eps_gamma_repeats, mu_repeats)
+    # X_repeats = X_repeats.reshape(num_nodes, num_features * eps_gamma_repeats, mu_repeats)
+    # Final shape: (num_nodes, num_features * eps_gamma_repeats, mu_repeats)
     return X_repeats
 
 
@@ -121,7 +134,8 @@ def create_feature_generator(
         num_nodes: int, 
         in_feats: int, 
         labels: torch.Tensor, 
-        num_mu_samples: int = 1
+        num_mu_samples: int = 1,
+        num_eps_gamma_samples: int = 1
     ) -> torch.Tensor:
         """
         Generate features with predefined covariance structure.
@@ -148,7 +162,8 @@ def create_feature_generator(
         features_np = generate_features(
             num_nodes, in_feats, labels_np,
             inter_class_cov, intra_class_cov, global_cov, noise_cov,
-            mu_repeats=num_mu_samples
+            mu_repeats=num_mu_samples,
+            eps_gamma_repeats=num_eps_gamma_samples
         )
         
         # Convert to torch tensor with requested dtype

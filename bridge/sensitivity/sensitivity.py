@@ -97,7 +97,7 @@ def estimate_sensitivity_analytic(
         for p in range(num_classes):
             for q in range(in_feats):
                 for r in range(in_feats):
-                    sensitivity_matrix[:,p,q,r] = W[q,p] * W[r,p] * row_sums
+                    sensitivity_matrix[:,p,q,r] = W[q,p] * W[r,p] * (row_sums**2)
 
     else:
         raise ValueError(f"Unknown sensitivity_type={sensitivity_type}")

@@ -1,0 +1,75 @@
+# BRIDGE Iterative Rewiring Experiment Configuration
+# BRIDGE Iterative Rewiring Experiment Configuration
+
+# Experiment type and name
+experiment_type: "rewiring"
+experiment_name: "simulated_acc_3"
+
+# General settings
+seed: 42
+device: "cuda"
+num_trials: 100
+num_splits: 10
+early_stopping: 50
+
+# Model settings
+do_hp: false                  # Use high-pass filters
+do_self_loop: false          # Add self-loops to graphs
+do_residual: false            # Use residual connections in GCN
+
+# Dataset settings
+dataset_type: "synthetic"
+standard_datasets:
+#  - "cora"
+#  - "actor"
+#  - "citeseer"
+#  - "chameleon"
+#  - "squirrel"
+#  - "wisconsin"
+#  - "cornell"
+#  - "texas"
+#  - "pubmed"
+
+# Synthetic dataset parameters (used if dataset_type is "synthetic")
+syn_nodes: 3000
+syn_classes: 2
+syn_homophily: 0.6
+syn_degree: 10
+syn_features: 128
+
+
+# Optimization parameters for base GCN
+gcn_h_feats: [16, 32, 64, 128]
+gcn_n_layers: [1,3]
+gcn_dropout_range: [0.0, 0.7]
+gcn_wd_range: [1.0e-5, 0.1]
+gcn_lr_range: [1.0e-6, 1.0e-3]
+
+
+# Optimization parameters for rewiring
+temperature_range: [1.0e-5, 2.0]
+p_add_range: [1.0, 1.0]
+p_remove_range: [1.0, 1.0]
+
+# Optimization parameters for selective GCN
+h_feats_selective_options: [16, 32, 64, 128]
+n_layers_selective_options: [1,3]
+dropout_selective_range: [0.0, 0.7]
+lr_selective_range: [1.0e-5, 0.1]
+wd_selective_range: [1.0e-6, 1.0e-3]
+
+# Iterative rewiring parameters
+use_iterative_rewiring: true     # Enable iterative rewiring approach
+n_rewire_iterations_range: [1, 25]
+use_sgc: true                    # Use SGC for faster rewiring
+sgc_K_options: [1,3]
+lr_selective_range: [1.0e-5, 0.1]
+sgc_wd_range: [1.0e-6, 1.0e-3]
+
+simulated_acc: 1.0
+
+
+# Symmetry checking
+check_symmetry: False             # Check and enforce graph symmetry
+
+

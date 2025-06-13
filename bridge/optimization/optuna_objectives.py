@@ -211,10 +211,11 @@ def train_and_evaluate_gcn(
     #     se = stats.sem(data)
     #     ci = stats.t.interval(confidence, n-1, loc=np.mean(data), scale=se)
     #     return ci
-
-    train_ci = compute_confidence_interval(train_accs, confidence=0.95)
-    val_ci = compute_confidence_interval(val_accs, confidence=0.95)
-    test_ci = compute_confidence_interval(test_accs, confidence=0.95)
+    
+    #mean_, lower_bound, upper_bound
+    _, *train_ci = compute_confidence_interval(train_accs, confidence=0.95)
+    _, *val_ci = compute_confidence_interval(val_accs, confidence=0.95)
+    _, *test_ci = compute_confidence_interval(test_accs, confidence=0.95)
 
     return (
         mean_train,
@@ -269,12 +270,53 @@ def objective_gcn(
     weight_decay_range = weight_decay_range or [1e-6, 1e-3]
     
     # Sample hyperparameters for GCN
+    # trial,
+    #     n_rewire_iterations_range,
+    #     'n_rewire_iterations',
+    #     param_type="int"
+    # params = {
+    #     'h_feats': trial.suggest_categorical('h_feats', h_feats_options),
+    #     'n_layers': trial_suggest_or_fixed(trial, n_layers_options, 'n_layers', param_type='categorical'),
+    #     'dropout_p': trial.suggest_float('dropout_p', dropout_range[0], dropout_range[1]),
+    #     'model_lr': trial.suggest_float('model_lr', lr_range[0], lr_range[1], log=True),
+    #     'weight_decay': trial.suggest_float('weight_decay', weight_decay_range[0], weight_decay_range[1], log=True)
+    # }
+    
+    # inside your objective function…
+
     params = {
-        'h_feats': trial.suggest_categorical('h_feats', h_feats_options),
-        'n_layers': trial.suggest_categorical('n_layers', n_layers_options),
-        'dropout_p': trial.suggest_float('dropout_p', dropout_range[0], dropout_range[1]),
-        'model_lr': trial.suggest_float('model_lr', lr_range[0], lr_range[1], log=True),
-        'weight_decay': trial.suggest_float('weight_decay', weight_decay_range[0], weight_decay_range[1], log=True)
+        'h_feats': trial_suggest_or_fixed(
+            trial,
+            h_feats_options,              # e.g. [16, 32, 64]
+            'h_feats',
+            param_type='categorical'
+        ),
+        'n_layers': trial_suggest_or_fixed(
+            trial,
+            n_layers_options,             # e.g. [1,2,3] or [2] if fixed
+            'n_layers',
+            param_type='categorical'
+        ),
+        'dropout_p': trial_suggest_or_fixed(
+            trial,
+            dropout_range,                # e.g. [0.0, 0.5] or [0.2] if fixed
+            'dropout_p',
+            param_type='float'
+        ),
+        'model_lr': trial_suggest_or_fixed(
+            trial,
+            lr_range,                     # e.g. [1e-5, 1e-2] or [1e-3]
+            'model_lr',
+            param_type='float',
+            log_scale=True
+        ),
+        'weight_decay': trial_suggest_or_fixed(
+            trial,
+            weight_decay_range,           # e.g. [1e-6, 1e-3] or [0.0]
+            'weight_decay',
+            param_type='float',
+            log_scale=True
+        ),
     }
     
     # Train and evaluate
@@ -417,11 +459,11 @@ def objective_rewiring(
     num_graphs = 1
     
     # Use best GCN parameters for cold-start GCN
-    h_feats_gcn = best_gcn_params['h_feats']
-    n_layers_gcn = best_gcn_params['n_layers']
-    dropout_p_gcn = best_gcn_params['dropout_p']
-    model_lr_gcn = best_gcn_params['model_lr']
-    wd_gcn = best_gcn_params['weight_decay']
+    h_feats_gcn = best_gcn_params.get('h_feats', 64)
+    n_layers_gcn = best_gcn_params.get('n_layers', 1)
+    dropout_p_gcn = best_gcn_params.get('dropout_p',0.5)
+    model_lr_gcn = best_gcn_params.get('model_lr',1e-3)
+    wd_gcn = best_gcn_params.get('weight_decay',1e-5)
 
     # Sample parameters for selective GCN
     h_feats_sel = trial.suggest_categorical('h_feats_selective', h_feats_selective_options)
@@ -512,7 +554,8 @@ def objective_iterative_rewiring(
     use_sgc: bool = True,
     sgc_K_options: List[int] = None,
     sgc_lr_range: List[float] = None,
-    sgc_wd_range: List[float] = None
+    sgc_wd_range: List[float] = None,
+    simulated_acc: Optional[float] = None
 ) -> float:
     """
     Objective function for optimizing iterative rewiring and selective GCN parameters with Optuna.
@@ -546,6 +589,7 @@ def objective_iterative_rewiring(
         sgc_K_options: Options for number of propagation steps for SGC
         sgc_lr_range: Range for SGC learning rate
         sgc_wd_range: Range for SGC weight decay
+        simulated_acc: Optional simulated accuracy for testing purposes (default: None)
         
     Returns:
         float: Negative validation accuracy (to be minimized)
@@ -624,12 +668,12 @@ def objective_iterative_rewiring(
     P_k = all_matrices[matrix_idx]
     num_graphs = 1
     
-    # Use best GCN parameters for cold-start GCN
-    h_feats_gcn = best_gcn_params['h_feats']
-    n_layers_gcn = best_gcn_params['n_layers']
-    dropout_p_gcn = best_gcn_params['dropout_p']
-    model_lr_gcn = best_gcn_params['model_lr']
-    wd_gcn = best_gcn_params['weight_decay']
+    # Use best GCN parameters for cold-start GCN    
+    h_feats_gcn = best_gcn_params.get('h_feats', 64)
+    n_layers_gcn = best_gcn_params.get('n_layers', 1)
+    dropout_p_gcn = best_gcn_params.get('dropout_p',0.5)
+    model_lr_gcn = best_gcn_params.get('model_lr',1e-3)
+    wd_gcn = best_gcn_params.get('weight_decay',1e-5)
 
     # Sample parameters for selective GCN
     h_feats_sel = trial_suggest_or_fixed(
@@ -730,7 +774,8 @@ def objective_iterative_rewiring(
         n_rewire=n_rewire,
         sgc_K=sgc_K,
         sgc_lr=sgc_lr,
-        sgc_wd=sgc_wd
+        sgc_wd=sgc_wd,
+        simulated_acc=simulated_acc
     )
 
     # Store the permutation matrix used

@@ -24,7 +24,7 @@ from bridge.utils.dataset_processing import add_train_val_test_splits, load_filt
 from bridge.utils import set_seed, generate_all_symmetric_permutation_matrices, check_symmetry
 from bridge.optimization import objective_gcn, objective_rewiring, objective_iterative_rewiring, train_and_evaluate_gcn
 from bridge.datasets import SyntheticGraphDataset
-from bridge.sensitivity.run_experiment import run_sensitivity_experiments
+from bridge.sensitivity.run_experiment import run_full_sensitivity_experiment
 from bridge.rewiring import run_bridge_experiment, run_iterative_bridge_experiment
 
 
@@ -107,6 +107,8 @@ def parse_args():
                         help='Number of propagation steps for SGC in iterative rewiring')
     parser.add_argument('--sgc_lr_range', type=int, default=[1e-5, 0.1],
                         help='Number of propagation steps for SGC in iterative rewiring')
+    parser.add_argument('--simulated_acc', default=None, action='store_true',
+                    help='Use simulated accuracy for iterative rewiring optimization')
     
     # Symmetry checking
     parser.add_argument('--check_symmetry', action='store_false', help='Check and enforce graph symmetry')
@@ -260,7 +262,11 @@ def run_rewiring_experiment(args):
     
     elif args.dataset_type == 'synthetic':
         # Create synthetic datasets
-        homophily_values = [args.syn_homophily]
+        if isinstance(args.syn_homophily,(list,tuple)):
+            homophily_values = args.syn_homophily
+        else:
+            homophily_values = [args.syn_homophily]
+        
         for h in homophily_values:
             datasets.append(SyntheticGraphDataset(
                 n=args.syn_nodes,
@@ -320,6 +326,7 @@ def run_rewiring_experiment(args):
                         print(f"  - SGC propagation steps: {args.sgc_K_options}")
                         print(f"  - SGC weight decay: {args.sgc_wd_range}")
                         print(f"  - SGC learning rate: {args.sgc_lr_range}")
+                    print(f'  - Simulated accuracy: {args.simulated_acc}')
                 
                 # Create dataset-specific study names
                 gcn_study_name = f"gcn-{dataset_name}-{timestamp}"
@@ -358,7 +365,9 @@ def run_rewiring_experiment(args):
                 
                 # Get best GCN parameters
                 best_gcn_params = gcn_study.best_params
+                best_gcn_attributes = gcn_study.best_trial.user_attrs
                 print("\nBest GCN parameters:", best_gcn_params)
+                print("Best GCN attributes:", best_gcn_attributes)
                 print("Best GCN validation accuracy:", -gcn_study.best_value)
                 print("Best GCN test accuracy:", gcn_study.best_trial.user_attrs['test_acc'])
                 
@@ -398,7 +407,8 @@ def run_rewiring_experiment(args):
                             use_sgc=args.use_sgc,
                             sgc_K_options=args.sgc_K_options,
                             sgc_wd_range=args.sgc_wd_range,
-                            sgc_lr_range=args.sgc_lr_range
+                            sgc_lr_range=args.sgc_lr_range,
+                            simulated_acc=args.simulated_acc
                         )
                     else:
                         return objective_rewiring(
@@ -491,11 +501,11 @@ def run_rewiring_experiment(args):
                 d_out = best_rewiring_params.get('d_out', best_rewiring_attributes.get('d_out'))
                 
                 # Select GCN hyperparameters
-                h_feats_gcn = best_gcn_params['h_feats']
-                n_layers_gcn = best_gcn_params['n_layers']
-                dropout_p_gcn = best_gcn_params['dropout_p']
-                model_lr_gcn = best_gcn_params['model_lr']
-                wd_gcn = best_gcn_params['weight_decay']
+                h_feats_gcn = best_gcn_params.get('h_feats', best_gcn_attributes.get('h_feats'))#['h_feats']
+                n_layers_gcn = best_gcn_params.get('n_layers', best_gcn_attributes.get('n_layers'))#['h_feats']
+                dropout_p_gcn = best_gcn_params.get('dropout_p', best_gcn_attributes.get('dropout_p'))#['dropout_p']
+                model_lr_gcn = best_gcn_params.get('model_lr', best_gcn_attributes.get('model_lr'))#['model_lr']
+                wd_gcn = best_gcn_params.get('weight_decay', best_gcn_attributes.get('weight_decay'))#['weight_decay']
                 
                 # Select selective GCN hyperparameters
                 h_feats_sel = best_rewiring_params.get('h_feats_selective', best_rewiring_attributes.get('h_feats_selective'))
@@ -567,7 +577,8 @@ def run_rewiring_experiment(args):
                         n_rewire=n_rewire_iterations,
                         sgc_K=sgc_K,
                         sgc_wd=sgc_wd,
-                        sgc_lr=sgc_lr
+                        sgc_lr=sgc_lr,
+                        simulated_acc=args.simulated_acc
                     )
                 else:
                     # Run standard rewiring experiment
@@ -722,7 +733,7 @@ def main():
         run_rewiring_experiment(args)
     elif args.experiment_type == 'sensitivity':
         if args.config:
-            results_dir = run_sensitivity_experiments(args.config)
+            results_dir = run_full_sensitivity_experiment(args.config)
             print(f"Sensitivity analysis completed. Results saved to {results_dir}")
         else:
             print("Error: Config file is required for sensitivity analysis experiments.")

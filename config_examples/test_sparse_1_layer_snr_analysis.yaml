@@ -1,0 +1,40 @@
+seed: 42
+device: cuda # or cpu
+results_dir: "results/sensitivity_framework_validation_detailed"
+
+sbm_params:
+  n_nodes: 200
+  mean_degree: 3
+  num_classes: 2 # For 2-block SBM
+  h_min: 0.0
+  h_max: 1.0
+  h_steps: 11 # 0.0, 0.1, ..., 1.0
+
+feature_params:
+  dim: 128
+  sigma_intra: 1.0e-4 # Scalar multiplier for Identity
+  sigma_inter: 0.0 # Scalar multiplier for Identity
+  phi_global: 1.0e-3  # Scalar multiplier for Identity (Global shift variance)
+  psi_noise: 1.0e-3   # Scalar multiplier for Identity (Node noise variance)
+
+model_params:
+  hidden_feats: 32
+  n_epochs: 1000
+  lr: 0.001
+  weight_decay: 0.0005
+  n_layers: 2  # Use two-layer models (TwoLayerGCN and TwoLayerFNN)
+
+experiment_params:
+  num_total_runs: 100 # Per homophily value
+  num_mc_simulations: 2 # Outer loop for SNR_MC (N_mu)
+  num_mc_inner_samples: 2 # Inner loop for SNR_MC (N_gamma_epsilon)
+  rho: 0.5 # Example: psi_qq / (phi_qq + psi_qq) when psi_qq = phi_qq = 1e-4
+           # This should be calculated based on feature_params: psi_noise / (phi_global + psi_noise)
+
+single_graph: true  # Use same graph for all runs at each homophily value
+# single_graph: false  # Generate new graph for each run (default)
+
+# "h_feats": 128,
+# "dropout_p": 0.006896918461167745,
+# "model_lr": 0.0008383367149885124,
+# "weight_decay": 0.00011164837920695602

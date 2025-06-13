@@ -64,16 +64,18 @@ def estimate_snr_monte_carlo(
     H_var = torch.zeros(num_nodes, out_feats, num_montecarlo_simulations, device=device)
 
     # Generate features for all simulations at once
-    feats_4d_stacked_feats = feature_generator(
+    feats_4d_feats = feature_generator(
         num_nodes=num_nodes,
-        in_feats=in_feats*num_montecarlo_simulations,
+        in_feats=in_feats, # PROBLEM: this is a hack to generate all features at once means 
+        # different mu samples are used for the resampled gamma+epsilons. should be same mu for all samples of gamma dn epsilon
         labels=labels,
-        num_mu_samples=inner_samples
+        num_mu_samples=inner_samples,
+        num_eps_gamma_samples=num_montecarlo_simulations,
     ).to(device)
     
-    for outer_idx in tqdm(range(num_montecarlo_simulations), desc="MC SNR Estimation"):
+    for outer_idx in range(num_montecarlo_simulations):
         # Extract features for this simulation
-        feats_3d = feats_4d_stacked_feats[:, outer_idx*in_feats:(1+outer_idx)*in_feats, :].double()
+        feats_3d = feats_4d_feats[:, :, outer_idx, :].double()
 
         with torch.no_grad():
             # model(...) => [num_nodes, out_feats, inner_samples] (for LinearGCN)
@@ -99,7 +101,7 @@ def estimate_snr_monte_carlo(
 
     # Return SNR for each node and feature
     snr_estimate = var_across_mu / mean_cond_var
-    return snr_estimate
+    return snr_estimate #shape: [num_nodes, out_feats]
 
 
 def estimate_snr_theorem(
@@ -160,7 +162,7 @@ def estimate_snr_theorem(
     denominator[denominator < 1e-8] = 1e-8
 
     # Average SNR across output features
-    return torch.mean(numerator / denominator, dim=1)
+    return torch.mean(numerator / denominator, dim=1) #shape: [num_nodes, out_size]
 
 
 def estimate_snr_theorem_autograd(

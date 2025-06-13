@@ -33,9 +33,9 @@ standard_datasets:
 # Synthetic dataset parameters (used if dataset_type is "synthetic")
 syn_nodes: 3000
 syn_classes: 2
-syn_homophily: 0.4
-syn_degree: 20
-syn_features: 5
+syn_homophily: 0.35
+syn_degree: 10
+syn_features: 128
 
 # Optimization parameters for base GCN
 gcn_h_feats: [16, 32, 64, 128]

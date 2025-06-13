@@ -1,0 +1,37 @@
+# Example configuration for two-layer models  
+# This demonstrates the new n_layers parameter set to 2
+seed: 42
+device: cuda # or cpu
+results_dir: "results/test_two_layer_models"
+
+sbm_params:
+  n_nodes: 200
+  mean_degree: 8
+  num_classes: 2 # For 2-block SBM
+  h_min: 0.1
+  h_max: 0.9
+  h_steps: 5 # 0.1, 0.3, 0.5, 0.7, 0.9
+
+feature_params:
+  dim: 5
+  sigma_intra: 1.0e-4 # Scalar multiplier for Identity
+  sigma_inter: 0.0 # Scalar multiplier for Identity
+  phi_global: 1.0e-3  # Scalar multiplier for Identity (Global shift variance)
+  psi_noise: 1.0e-3   # Scalar multiplier for Identity (Node noise variance)
+
+model_params:
+  hidden_feats: 32
+  n_epochs: 200
+  lr: 0.01
+  weight_decay: 0.0005
+  n_layers: 2  # Use two-layer models (TwoLayerGCN and TwoLayerFNN)
+
+
+experiment_params:
+  num_total_runs: 50 # Reduced for testing
+  num_mc_simulations: 50 # Reduced for testing
+  num_mc_inner_samples: 50 # Reduced for testing
+  rho: 0.5
+
+single_graph: true  # Use same graph for all runs at each homophily value
+# single_graph: false  # Generate new graph for each run (default)

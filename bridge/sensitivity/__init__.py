@@ -15,16 +15,16 @@ Main components:
 - Visualization: Functions for visualizing sensitivity analysis results
 """
 
-from .models import LinearGCN, TwoLayerGCN
-from .snr import (
-    estimate_snr_monte_carlo,
-    estimate_snr_theorem,
-    estimate_snr_theorem_autograd
-)
+from .models import LinearGCN, TwoLayerGCN, FNN, TwoLayerFNN
 from .sensitivity import (
     estimate_sensitivity_analytic,
     compute_jacobian,
     estimate_sensitivity_autograd
+)
+from .snr import (
+    estimate_snr_monte_carlo,
+    estimate_snr_theorem,
+    estimate_snr_theorem_autograd
 )
 from .feature_gen import generate_features, create_feature_generator
 from .utils import (
@@ -35,14 +35,12 @@ from .utils import (
     run_multi_graph_experiment
 )
 from .visualization import (
-    plot_snr_vs_homophily,
-    plot_sensitivity_vs_graph_property,
-    plot_node_level_snr
+    plot_local_sensitivity_validation, plot_snr_ratio_analysis, plot_bottlenecking_snr_scatter, plot_graph_wide_snr_validation
 )
 
 __all__ = [
     # Models
-    'LinearGCN', 'TwoLayerGCN',
+    'LinearGCN', 'TwoLayerGCN', 'FNN', 'TwoLayerFNN',
     
     # SNR estimation
     'estimate_snr_monte_carlo', 'estimate_snr_theorem', 'estimate_snr_theorem_autograd',
@@ -58,5 +56,6 @@ __all__ = [
     'run_sensitivity_experiment', 'run_multi_graph_experiment',
     
     # Visualization
-    'plot_snr_vs_homophily', 'plot_sensitivity_vs_graph_property', 'plot_node_level_snr'
+    'plot_local_sensitivity_validation', 'plot_snr_ratio_analysis',
+    'plot_bottlenecking_snr_scatter', 'plot_graph_wide_snr_validation'
 ]
