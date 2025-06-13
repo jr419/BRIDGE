@@ -512,8 +512,4 @@ if __name__ == "__main__":
     parser.add_argument('--config', type=str, required=True, help='Path to the experiment configuration YAML file.')
     args = parser.parse_args()
     
-<<<<<<< HEAD
     run_full_sensitivity_experiment(args.config)
-=======
-    run_sensitivity_experiments(args.config)
->>>>>>> e1e35361c390567982add7bf945bb03b0d64394e
