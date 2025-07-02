@@ -6,17 +6,17 @@ using Optuna, with a focus on graph rewiring approaches.
 """
 
 from .optuna_objectives import (
-    objective_gcn, 
+    objective_mpnn, 
     objective_rewiring, 
     objective_iterative_rewiring,
     collect_float_metrics,
-    train_and_evaluate_gcn
+    train_and_evaluate_mpnn
 )
 
 __all__ = [
-    'objective_gcn', 
+    'objective_mpnn', 
     'objective_rewiring',
     'objective_iterative_rewiring', 
     'collect_float_metrics',
-    'train_and_evaluate_gcn'
+    'train_and_evaluate_mpnn'
 ]

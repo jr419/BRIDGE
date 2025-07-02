@@ -22,7 +22,7 @@ from typing import List, Dict, Any
 
 from bridge.utils.dataset_processing import add_train_val_test_splits, load_filtered_heterophily
 from bridge.utils import set_seed, generate_all_symmetric_permutation_matrices, check_symmetry
-from bridge.optimization import objective_gcn, objective_rewiring, objective_iterative_rewiring, train_and_evaluate_gcn
+from bridge.optimization import objective_mpnn, objective_rewiring, objective_iterative_rewiring, train_and_evaluate_mpnn
 from bridge.datasets import SyntheticGraphDataset
 from bridge.sensitivity.run_experiment import run_full_sensitivity_experiment
 from bridge.rewiring import run_bridge_experiment, run_iterative_bridge_experiment
@@ -50,7 +50,7 @@ def parse_args():
     # Model settings
     parser.add_argument('--do_hp', action='store_true', help='Use higher-order polynomial filters')
     parser.add_argument('--do_self_loop', action='store_true', help='Add self-loops to graphs')
-    parser.add_argument('--do_residual', action='store_true', help='Use residual connections in GCN')
+    parser.add_argument('--do_residual', action='store_true', help='Use residual connections in MPNN')
     parser.add_argument('--early_stopping', type=int, default=50, help='Early stopping patience')
     
     # Dataset settings
@@ -67,16 +67,18 @@ def parse_args():
     parser.add_argument('--syn_features', type=int, default=5, help='Number of features for synthetic dataset')
     
     # Optimization parameters
-    parser.add_argument('--gcn_h_feats', nargs='+', type=int, default=[16, 32, 64, 128],
-                        help='Hidden feature dimensions to try for GCN')
-    parser.add_argument('--gcn_n_layers', nargs='+', type=int, default=[1, 2, 3],
-                        help='Number of layers to try for GCN')
-    parser.add_argument('--gcn_dropout_range', nargs=2, type=float, default=[0.0, 0.7],
-                        help='Dropout range for GCN [min, max]')
-    parser.add_argument('--lr_gcn_range', nargs=2, type=float, default=[1e-5, 0.1],
-                        help='Learning rate range for GCN [min, max]')
-    parser.add_argument('--wd_gcn_range', nargs=2, type=float, default=[1e-5, 0.1],
-                        help='Weight decay range for GCN [min, max]')
+    parser.add_argument('--model_type', type=str, default='GCN',
+                        help='Model type to use for optimization (e.g., GCN, GAT,GIN GRAPHSAGE)')
+    parser.add_argument('--mpnn_h_feats', nargs='+', type=int, default=[16, 32, 64, 128],
+                        help='Hidden feature dimensions to try for MPNN')
+    parser.add_argument('--mpnn_n_layers', nargs='+', type=int, default=[1, 2, 3],
+                        help='Number of layers to try for MPNN')
+    parser.add_argument('--mpnn_dropout_range', nargs=2, type=float, default=[0.0, 0.7],
+                        help='Dropout range for MPNN [min, max]')
+    parser.add_argument('--lr_mpnn_range', nargs=2, type=float, default=[1e-5, 0.1],
+                        help='Learning rate range for MPNN [min, max]')
+    parser.add_argument('--wd_mpnn_range', nargs=2, type=float, default=[1e-5, 0.1],
+                        help='Weight decay range for MPNN [min, max]')
     parser.add_argument('--temperature_range', nargs=2, type=float, default=[1e-5, 2.0],
                         help='Temperature range for softmax [min, max]')
     parser.add_argument('--p_add_range', nargs=2, type=float, default=[0.0, 1.0],
@@ -84,15 +86,15 @@ def parse_args():
     parser.add_argument('--p_remove_range', nargs=2, type=float, default=[0.0, 1.0],
                         help='Probability range for removing edges [min, max]')
     parser.add_argument('--h_feats_selective_options', nargs='+', type=int, default=[16, 32, 64, 128],
-                        help='Hidden feature dimensions to try for selective GCN')
+                        help='Hidden feature dimensions to try for selective MPNN')
     parser.add_argument('--n_layers_selective_options', nargs='+', type=int, default=[1, 2, 3],
-                        help='Number of layers to try for selective GCN')
+                        help='Number of layers to try for selective MPNN')
     parser.add_argument('--dropout_selective_range', nargs=2, type=float, default=[0.0, 0.7],
-                        help='Dropout range for selective GCN [min, max]')
+                        help='Dropout range for selective MPNN [min, max]')
     parser.add_argument('--lr_selective_range', nargs=2, type=float, default=[1e-5, 0.1],
-                        help='Learning rate range for selective GCN [min, max]')
+                        help='Learning rate range for selective MPNN [min, max]')
     parser.add_argument('--wd_selective_range', nargs=2, type=float, default=[1e-5, 0.1],
-                        help='Weight decay range for selective GCN [min, max]')
+                        help='Weight decay range for selective MPNN [min, max]')
     
     # Iterative rewiring parameters
     parser.add_argument('--use_iterative_rewiring', action='store_true', 
@@ -294,6 +296,7 @@ def run_rewiring_experiment(args):
                 print(f"Processing {dataset_name} Dataset")
                 print(f"{'='*50}")
                 
+                
                 # Move graph to device
                 g = g.to(device)
                 if args.do_self_loop:
@@ -304,7 +307,7 @@ def run_rewiring_experiment(args):
                 do_hp = args.do_hp
                 if do_hp and dataset_name.lower() in ['cora', 'citeseer', 'pubmed']:
                     do_hp = False
-                    print(f"Disabling HP mode for {dataset_name} (not recommended for this dataset)")
+                    print(f"Disabling HP mode for {dataset_name}")
                 
                 # Print dataset statistics
                 print(f"\nDataset Statistics:")
@@ -315,6 +318,7 @@ def run_rewiring_experiment(args):
                 print(f"Is symmetric: {check_symmetry(g)}")
                 print(f"Number of features: {g.ndata['feat'].shape[1]}")
                 print(f"Number of classes: {len(torch.unique(g.ndata['label']))}")
+                print(f"Model type: {args.model_type}")
                 print(f"HP mode: {do_hp}")
                 print(f"Self-loops: {args.do_self_loop}")
                 print(f"Residual connections: {args.do_residual}")
@@ -329,14 +333,26 @@ def run_rewiring_experiment(args):
                     print(f'  - Simulated accuracy: {args.simulated_acc}')
                 
                 # Create dataset-specific study names
-                gcn_study_name = f"gcn-{dataset_name}-{timestamp}"
+                mpnn_study_name = f"{args.model_type}-{dataset_name}-{timestamp}"
                 rewiring_study_name = f"rewiring-{dataset_name}-{timestamp}"
                 
-                print(f"\n=== Stage 1: Optimizing Base GCN for {dataset_name} ===")
+                # Generate all possible symmetric permutation matrices
+                y = g.ndata['label']
                 
-                # Create and setup the objective function for GCN optimization
-                def gcn_objective(trial):
-                    return objective_gcn(
+                #class proportions
+                class_counts = torch.bincount(y)
+                pi = class_counts / len(y)
+                Pi = np.diag(pi.cpu().numpy())
+                k = len(class_counts)
+                all_matrices = generate_all_symmetric_permutation_matrices(k, Pi)
+                print(f"Generated {len(all_matrices)} symmetric permutation matrices for {k} classes:")
+                print([np.trace(Pi@mat) for mat in all_matrices])
+                
+                print(f"\n=== Stage 1: Optimizing Base MPNN for {dataset_name} ===")
+                
+                # Create and setup the objective function for MPNN optimization
+                def mpnn_objective(trial):
+                    return objective_mpnn(
                         trial, 
                         g, 
                         device=device,
@@ -346,38 +362,37 @@ def run_rewiring_experiment(args):
                         do_hp=do_hp,
                         do_residual_connections=args.do_residual,
                         dataset_name=dataset_name,
-                        h_feats_options=args.gcn_h_feats,
-                        n_layers_options=args.gcn_n_layers,
-                        dropout_range=args.gcn_dropout_range,
-                        lr_range=args.lr_gcn_range,
-                        weight_decay_range=args.wd_gcn_range,
+                        model_type=args.model_type,
+                        h_feats_options=args.mpnn_h_feats,
+                        n_layers_options=args.mpnn_n_layers,
+                        dropout_range=args.mpnn_dropout_range,
+                        lr_range=args.lr_mpnn_range,
+                        weight_decay_range=args.wd_mpnn_range,
                     )
                 
-                # Create and run study for GCN optimization
-                gcn_study = optuna.create_study(
-                    study_name=gcn_study_name,
-                    storage=f"sqlite:///{results_dir}/gcn_study.db",
+                # Create and run study for MPNN optimization
+                mpnn_study = optuna.create_study(
+                    study_name=mpnn_study_name,
+                    storage=f"sqlite:///{results_dir}/mpnn_study.db",
                     direction='minimize',
                     load_if_exists=True
                 )
                 
-                gcn_study.optimize(gcn_objective, n_trials=args.num_trials)
+                mpnn_study.optimize(mpnn_objective, n_trials=args.num_trials)
                 
-                # Get best GCN parameters
-                best_gcn_params = gcn_study.best_params
-                best_gcn_attributes = gcn_study.best_trial.user_attrs
-                print("\nBest GCN parameters:", best_gcn_params)
-                print("Best GCN attributes:", best_gcn_attributes)
-                print("Best GCN validation accuracy:", -gcn_study.best_value)
-                print("Best GCN test accuracy:", gcn_study.best_trial.user_attrs['test_acc'])
+                # Get best MPNN parameters
+                best_mpnn_params = mpnn_study.best_params
+                best_mpnn_attributes = mpnn_study.best_trial.user_attrs
+                print("\nBest MPNN parameters:", best_mpnn_params)
+                print("Best MPNN attributes:", best_mpnn_attributes)
+                print("Best MPNN validation accuracy:", -mpnn_study.best_value)
+                print("Best MPNN test accuracy:", mpnn_study.best_trial.user_attrs['test_acc'])
                 
-                print(f"\n=== Stage 2: Optimizing Rewiring & Selective GCN for {dataset_name} ===")
+                print(f"\n=== Stage 2: Optimizing {args.model_type} Rewiring for {dataset_name} ===")
                 
                 # Get the number of classes
                 k = len(torch.unique(g.ndata['label']))
                 
-                # Generate all possible symmetric permutation matrices
-                all_matrices = generate_all_symmetric_permutation_matrices(k)
                 
                 # Create and setup the objective function for rewiring optimization
                 def rewiring_objective(trial):
@@ -385,12 +400,13 @@ def run_rewiring_experiment(args):
                         return objective_iterative_rewiring(
                             trial, 
                             g, 
-                            best_gcn_params, 
+                            best_mpnn_params, 
                             all_matrices,
                             device=device,
                             n_epochs=1000,
                             num_splits=args.num_splits,
                             early_stopping=args.early_stopping,
+                            model_type=args.model_type,
                             do_hp=do_hp,
                             do_self_loop=args.do_self_loop,
                             do_residual_connections=args.do_residual,
@@ -414,7 +430,7 @@ def run_rewiring_experiment(args):
                         return objective_rewiring(
                             trial, 
                             g, 
-                            best_gcn_params, 
+                            best_mpnn_params, 
                             all_matrices,
                             device=device,
                             n_epochs=1000,
@@ -465,7 +481,7 @@ def run_rewiring_experiment(args):
                         # Create a new study as before
                         rewiring_study = optuna.create_study(
                             study_name=rewiring_study_name,
-                            storage=f"sqlite:///{results_dir}/gcn_study.db",
+                            storage=f"sqlite:///{results_dir}/mpnn_study.db",
                             direction='minimize',
                             load_if_exists=True
                         )
@@ -475,7 +491,7 @@ def run_rewiring_experiment(args):
                     # Create a new study as before
                     rewiring_study = optuna.create_study(
                         study_name=rewiring_study_name,
-                        storage=f"sqlite:///{results_dir}/gcn_study.db",
+                        storage=f"sqlite:///{results_dir}/mpnn_study.db",
                         direction='minimize',
                         load_if_exists=True
                     )
@@ -500,14 +516,14 @@ def run_rewiring_experiment(args):
                 temperature = best_rewiring_params.get('temperature', best_rewiring_attributes.get('temperature'))
                 d_out = best_rewiring_params.get('d_out', best_rewiring_attributes.get('d_out'))
                 
-                # Select GCN hyperparameters
-                h_feats_gcn = best_gcn_params.get('h_feats', best_gcn_attributes.get('h_feats'))#['h_feats']
-                n_layers_gcn = best_gcn_params.get('n_layers', best_gcn_attributes.get('n_layers'))#['h_feats']
-                dropout_p_gcn = best_gcn_params.get('dropout_p', best_gcn_attributes.get('dropout_p'))#['dropout_p']
-                model_lr_gcn = best_gcn_params.get('model_lr', best_gcn_attributes.get('model_lr'))#['model_lr']
-                wd_gcn = best_gcn_params.get('weight_decay', best_gcn_attributes.get('weight_decay'))#['weight_decay']
+                # Select MPNN hyperparameters
+                h_feats_mpnn = best_mpnn_params.get('h_feats', best_mpnn_attributes.get('h_feats'))#['h_feats']
+                n_layers_mpnn = best_mpnn_params.get('n_layers', best_mpnn_attributes.get('n_layers'))#['h_feats']
+                dropout_p_mpnn = best_mpnn_params.get('dropout_p', best_mpnn_attributes.get('dropout_p'))#['dropout_p']
+                model_lr_mpnn = best_mpnn_params.get('model_lr', best_mpnn_attributes.get('model_lr'))#['model_lr']
+                wd_mpnn = best_mpnn_params.get('weight_decay', best_mpnn_attributes.get('weight_decay'))#['weight_decay']
                 
-                # Select selective GCN hyperparameters
+                # Select selective MPNN hyperparameters
                 h_feats_sel = best_rewiring_params.get('h_feats_selective', best_rewiring_attributes.get('h_feats_selective'))
                 n_layers_sel = best_rewiring_params.get('n_layers_selective', best_rewiring_attributes.get('n_layers_selective'))
                 dropout_p_sel = best_rewiring_params.get('dropout_p_selective', best_rewiring_attributes.get('dropout_p_selective'))
@@ -522,38 +538,40 @@ def run_rewiring_experiment(args):
                 
                 # Run final experiment with best parameters
 
-                # baseline GCN
-                print("Running baseline GCN experiment...")
-                (mean_train_gcn, mean_val_gcn, mean_test_gcn, train_ci_gcn, val_ci_gcn, test_ci_gcn) = train_and_evaluate_gcn(
-                    g = g,
-                    h_feats = h_feats_gcn,
-                    n_layers = n_layers_gcn,
-                    dropout_p = dropout_p_gcn,
-                    model_lr = model_lr_gcn,
-                    weight_decay = wd_gcn,
-                    n_epochs = 1000,
-                    early_stopping = args.early_stopping,
-                    device = device,
-                    num_splits = args.num_splits,
-                    log_training = False,
-                    do_hp = do_hp,
-                    do_self_loop = args.do_self_loop,
-                    do_residual_connections = args.do_residual,
-                    dataset_name = dataset_name,
+                # baseline MPNN
+                print(f"Running baseline {args.model_type} experiment...")
+                (mean_train_mpnn, mean_val_mpnn, mean_test_mpnn, train_ci_mpnn, val_ci_mpnn, test_ci_mpnn) = train_and_evaluate_mpnn(
+                    g=g,
+                    model_type=args.model_type,
+                    h_feats=h_feats_mpnn,
+                    n_layers=n_layers_mpnn,
+                    dropout_p=dropout_p_mpnn,
+                    model_lr=model_lr_mpnn,
+                    weight_decay=wd_mpnn,
+                    n_epochs=1000,
+                    early_stopping=args.early_stopping,
+                    device=device,
+                    num_splits=args.num_splits,
+                    log_training=False,
+                    do_hp=do_hp,
+                    do_self_loop=args.do_self_loop,
+                    do_residual_connections=args.do_residual,
+                    dataset_name=dataset_name,
                     )
 
                 # rewiring
                 if args.use_iterative_rewiring:
                     # Run iterative rewiring experiment
-                    print(f"Running iterative rewiring experiment with {n_rewire_iterations} iterations...")
+                    print(f"Running iterative {args.model_type} rewiring experiment with {n_rewire_iterations} iterations...")
                     stats_dict, results_list = run_iterative_bridge_experiment(
                         g,
                         P_k=P_k,
-                        h_feats_gcn=h_feats_gcn,
-                        n_layers_gcn=n_layers_gcn,
-                        dropout_p_gcn=dropout_p_gcn,
-                        model_lr_gcn=model_lr_gcn,
-                        wd_gcn=wd_gcn,
+                        model_type=args.model_type,
+                        h_feats_mpnn=h_feats_mpnn,
+                        n_layers_mpnn=n_layers_mpnn,
+                        dropout_p_mpnn=dropout_p_mpnn,
+                        model_lr_mpnn=model_lr_mpnn,
+                        wd_mpnn=wd_mpnn,
                         h_feats_selective=h_feats_sel,
                         n_layers_selective=n_layers_sel,
                         dropout_p_selective=dropout_p_sel,
@@ -586,11 +604,11 @@ def run_rewiring_experiment(args):
                     stats_dict, results_list = run_bridge_experiment(
                         g,
                         P_k=P_k,
-                        h_feats_gcn=h_feats_gcn,
-                        n_layers_gcn=n_layers_gcn,
-                        dropout_p_gcn=dropout_p_gcn,
-                        model_lr_gcn=model_lr_gcn,
-                        wd_gcn=wd_gcn,
+                        h_feats_mpnn=h_feats_mpnn,
+                        n_layers_mpnn=n_layers_mpnn,
+                        dropout_p_mpnn=dropout_p_mpnn,
+                        model_lr_mpnn=model_lr_mpnn,
+                        wd_mpnn=wd_mpnn,
                         h_feats_selective=h_feats_sel,
                         n_layers_selective=n_layers_sel,
                         dropout_p_selective=dropout_p_sel,
@@ -613,17 +631,17 @@ def run_rewiring_experiment(args):
                     )
                 
                 # Calculate improvement
-                baseline_test_acc = mean_test_gcn
+                baseline_test_acc = mean_test_mpnn
                 final_test_acc = stats_dict['test_acc_mean']
                 improvement = (final_test_acc - baseline_test_acc) / baseline_test_acc * 100
                 
                 # Store results for this dataset
                 dataset_results = {
-                    'base_gcn': {
-                        'params': best_gcn_params,
-                        'validation_accuracy': -mean_val_gcn,
-                        'test_accuracy': mean_test_gcn,
-                        'test_accuracy_ci': (test_ci_gcn[0], test_ci_gcn[1]),
+                    'base_mpnn': {
+                        'params': best_mpnn_params,
+                        'validation_accuracy': -mean_val_mpnn,
+                        'test_accuracy': mean_test_mpnn,
+                        'test_accuracy_ci': (test_ci_mpnn[0], test_ci_mpnn[1]),
                     },
                     'rewiring': {
                         'params': best_rewiring_params,
@@ -666,7 +684,7 @@ def run_rewiring_experiment(args):
                         json.dump(dataset_results, f, indent=2)
                 
                 print(f"\nResults for {dataset_name}:")
-                print(f"Base GCN Test Accuracy: {baseline_test_acc:.4f}")
+                print(f"Base MPNN Test Accuracy: {baseline_test_acc:.4f}")
                 print(f"Final Test Accuracy: {final_test_acc:.4f} ± "
                       f"{stats_dict['test_acc_ci'][1] - final_test_acc:.4f}")
                 print(f"Improvement: {improvement:.2f}%")
@@ -695,7 +713,7 @@ def run_rewiring_experiment(args):
         if 'error' not in results:
             summary_data.append({
                 'Dataset': dataset_name,
-                'Base GCN Accuracy': results['base_gcn']['test_accuracy'],
+                'Base MPNN Accuracy': results['base_mpnn']['test_accuracy'],
                 'Final Accuracy': results['rewiring']['test_accuracy_mean'],
                 'CI (±)': results['rewiring']['test_accuracy_ci'][1] - results['rewiring']['test_accuracy_mean'],
                 'Improvement (%)': results['improvement_percentage'],

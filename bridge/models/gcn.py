@@ -28,8 +28,8 @@ class GCN(nn.Module):
         dropout_p: Dropout probability
         activation: Activation function to use (default: F.relu)
         bias: Whether to use bias in GraphConv layers
-        residual_connection: Whether to use residual connections
-        do_hp: Whether to use HPGraphConv instead of GraphConv
+        residual_connection: Deprecated flag for residual connections (not used in this implementation)
+        do_hp: Depreciated flag for High Pass Graph Convolution (not used in this implementation)
     """
     def __init__(
         self, 
@@ -50,23 +50,14 @@ class GCN(nn.Module):
         self.do_hp = do_hp
         
         # Input layer
-        if do_hp:
-            self.layers.append(HPGraphConv(in_feats, h_feats, bias=bias, allow_zero_in_degree=True))
-        else:
-            self.layers.append(GraphConv(in_feats, h_feats, bias=bias, allow_zero_in_degree=True))
+        self.layers.append(GraphConv(in_feats, h_feats, bias=bias, allow_zero_in_degree=True))
         
         # Hidden layers (if any)
         for _ in range(n_layers - 1):
-            if do_hp:
-                self.layers.append(HPGraphConv(h_feats, h_feats, bias=bias, allow_zero_in_degree=True))
-            else:
-                self.layers.append(GraphConv(h_feats, h_feats, bias=bias, allow_zero_in_degree=True))
+            self.layers.append(GraphConv(h_feats, h_feats, bias=bias, allow_zero_in_degree=True))
      
         # Output layer
-        if do_hp:
-            self.layers.append(HPGraphConv(h_feats, out_feats, bias=bias, allow_zero_in_degree=True))
-        else:
-            self.layers.append(GraphConv(h_feats, out_feats, bias=bias, allow_zero_in_degree=True))
+        self.layers.append(GraphConv(h_feats, out_feats, bias=bias, allow_zero_in_degree=True))
 
     def forward(self, g: dgl.DGLGraph, features: torch.Tensor) -> torch.Tensor:
         """

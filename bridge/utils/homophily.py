@@ -154,6 +154,7 @@ def local_autophily(
     p: int,
     g: dgl.DGLGraph,
     self_loops: bool = False,
+    do_hp: bool = False,
     fix_d: bool = True,
     sym: bool = False,
     device: Union[str, torch.device] = 'cpu'
@@ -168,6 +169,7 @@ def local_autophily(
         p: The order of the local autophily
         g: Input graph
         self_loops: Whether to include self-loops in the adjacency matrix
+        do_hp : Whether to compute higher-order polynomial version (I - A)
         fix_d: Whether to fix the degree distribution by normalizing
         sym: Whether to symmetrize the adjacency matrix
         device: Device to perform computations on
@@ -176,19 +178,40 @@ def local_autophily(
         np.ndarray: An array containing the local autophily scores for each node
     """
     device = torch.device(device)
-    # Compute A_hat^p
-    A_hat_p = get_A_hat_p(p, g, self_loops=self_loops, fix_d=fix_d, sym=sym, device=device)
-    
-    # Compute sum_j A_hat_p[i,j]^2
-    local_autophily = (A_hat_p ** 2).sum(dim=1)
 
-    return local_autophily.cpu().numpy()
+    # 1) Build adjacency (sparse)
+    A = build_sparse_adj_matrix(g, self_loops=self_loops, sym=sym, device=device)
+
+    # 2) Normalize adjacency
+    A = normalize_sparse_adj(A)
+
+    if do_hp:
+        # Create sparse identity matrix
+        I = torch.sparse_coo_tensor(
+            indices=torch.arange(A.size(0)).repeat(2, 1),
+            values=torch.ones(A.size(0)),
+            size=A.size()
+        )
+        # Low pass filter: I - A
+        A = I - A
+
+    # 3) Build label matrix M
+    M = torch.eye(A.size(0), device=device)  # Identity matrix for autophily
+
+    # 4) Compute S = (A^p)  (shape: n x C)
+    S = power_adj_times_matrix(A, M, p)
+
+    # 5) local_autophily(i) =  S[i,i]^2
+    autophily_scores = S.diag()**2
+
+    return autophily_scores.detach().cpu()
 
 
 def local_total_connectivity(
     p: int,
     g: dgl.DGLGraph,
     self_loops: bool = False,
+    do_hp: bool = False,
     fix_d: bool = True,
     sym: bool = False,
     device: Union[str, torch.device] = 'cpu'
@@ -202,6 +225,7 @@ def local_total_connectivity(
         p: The order of the local connectivity
         g: Input graph
         self_loops: Whether to include self-loops in the adjacency matrix
+        do_hp: Whether to compute higher-order polynomial version (I - A)
         fix_d: Whether to fix the degree distribution by normalizing
         sym: Whether to symmetrize the adjacency matrix
         device: Device to perform computations on
@@ -210,11 +234,30 @@ def local_total_connectivity(
         np.ndarray: An array containing the local total connectivity scores for each node
     """
     device = torch.device(device)
-    # Compute A_hat^p
-    A_hat_p = get_A_hat_p(p, g, self_loops=self_loops, fix_d=fix_d, sym=sym, device=device)
-    
-    # Compute (sum_j A_hat_p[i,j])^2
-    sum_A = A_hat_p.sum(dim=1)
-    local_total_connectivity = sum_A ** 2
 
-    return local_total_connectivity.cpu().numpy()
+    # 1) Build adjacency (sparse)
+    A = build_sparse_adj_matrix(g, self_loops=self_loops, sym=sym, device=device)
+
+    # 2) Normalize adjacency
+    A = normalize_sparse_adj(A)
+
+    if do_hp:
+        # Create sparse identity matrix
+        I = torch.sparse_coo_tensor(
+            indices=torch.arange(A.size(0)).repeat(2, 1),
+            values=torch.ones(A.size(0)),
+            size=A.size()
+        )
+        # Low pass filter: I - A
+        A = I - A
+
+    # 3) Build label matrix M
+    M = torch.eye(A.size(0), device=device)  # Identity matrix for total_connectivity
+
+    # 4) Compute S = (A^p)  (shape: n x C)
+    S = power_adj_times_matrix(A, M, p)
+
+    # 5) local_total_connectivity(i) = sum_{j} S[i,j]^2
+    total_connectivity_scores = (S**2).sum(dim=1)
+
+    return total_connectivity_scores.detach().cpu()

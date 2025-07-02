@@ -13,6 +13,7 @@ import dgl.function as fn
 import numpy as np
 from tqdm import trange
 from typing import Tuple, List, Dict, Union, Optional, Any
+import copy
 
 from ..models import GCN, SelectiveGCN, SGC, SelectiveSGC
 from ..training import train, train_selective, get_metric_type
@@ -25,11 +26,11 @@ from .operations import create_rewired_graph
 def run_bridge_pipeline(
     g: dgl.DGLGraph,
     P_k: np.ndarray,
-    h_feats_gcn: int = 64,
-    n_layers_gcn: int = 2,
-    dropout_p_gcn: float = 0.5,
-    model_lr_gcn: float = 1e-3,
-    wd_gcn: float = 0.0,
+    h_feats_mpnn: int = 64,
+    n_layers_mpnn: int = 2,
+    dropout_p_mpnn: float = 0.5,
+    model_lr_mpnn: float = 1e-3,
+    wd_mpnn: float = 0.0,
     h_feats_selective: int = 64,
     n_layers_selective: int = 2,
     dropout_p_selective: float = 0.5,
@@ -66,11 +67,11 @@ def run_bridge_pipeline(
     Args:
         g: Input graph
         P_k: Permutation matrix for rewiring
-        h_feats_gcn: Hidden feature dimension for the base GCN
-        n_layers_gcn: Number of hidden layers for the base GCN
-        dropout_p_gcn: Dropout probability for the base GCN
-        model_lr_gcn: Learning rate for the base GCN
-        wd_gcn: Weight decay for the base GCN
+        h_feats_mpnn: Hidden feature dimension for the base GCN
+        n_layers_mpnn: Number of hidden layers for the base GCN
+        dropout_p_mpnn: Dropout probability for the base GCN
+        model_lr_mpnn: Learning rate for the base GCN
+        wd_mpnn: Weight decay for the base GCN
         h_feats_selective: Hidden feature dimension for the selective GCN
         n_layers_selective: Number of hidden layers for the selective GCN
         dropout_p_selective: Dropout probability for the selective GCN
@@ -143,8 +144,8 @@ def run_bridge_pipeline(
     out_feats = int(labels.max().item()) + 1
     
     model_cold = GCN(
-        in_feats, h_feats_gcn, out_feats, n_layers_gcn,
-        dropout_p_gcn, residual_connection=do_residual_connections, do_hp=do_hp
+        in_feats, h_feats_mpnn, out_feats, n_layers_mpnn,
+        dropout_p_mpnn, residual_connection=do_residual_connections, do_hp=do_hp
     ).to(device)
     
     train_acc_cold, val_acc_cold, test_acc_cold, model_cold = train(
@@ -153,8 +154,8 @@ def run_bridge_pipeline(
         train_mask,
         val_mask,
         test_mask,
-        model_lr=model_lr_gcn,
-        optimizer_weight_decay=wd_gcn,
+        model_lr=model_lr_mpnn,
+        optimizer_weight_decay=wd_mpnn,
         n_epochs=n_epochs,
         early_stopping=early_stopping,
         log_training=log_training,
@@ -300,11 +301,11 @@ def run_bridge_pipeline(
 def run_bridge_experiment(
     g: dgl.DGLGraph,
     P_k: np.ndarray,
-    h_feats_gcn: int = 64,
-    n_layers_gcn: int = 2,
-    dropout_p_gcn: float = 0.5,
-    model_lr_gcn: float = 1e-3,
-    wd_gcn: float = 0.0,
+    h_feats_mpnn: int = 64,
+    n_layers_mpnn: int = 2,
+    dropout_p_mpnn: float = 0.5,
+    model_lr_mpnn: float = 1e-3,
+    wd_mpnn: float = 0.0,
     h_feats_selective: int = 64,
     n_layers_selective: int = 2,
     dropout_p_selective: float = 0.5,
@@ -334,11 +335,11 @@ def run_bridge_experiment(
     Args:
         g: Input graph
         P_k: Permutation matrix for rewiring
-        h_feats_gcn: Hidden feature dimension for the base GCN
-        n_layers_gcn: Number of hidden layers for the base GCN
-        dropout_p_gcn: Dropout probability for the base GCN
-        model_lr_gcn: Learning rate for the base GCN
-        wd_gcn: Weight decay for the base GCN
+        h_feats_mpnn: Hidden feature dimension for the base GCN
+        n_layers_mpnn: Number of hidden layers for the base GCN
+        dropout_p_mpnn: Dropout probability for the base GCN
+        model_lr_mpnn: Learning rate for the base GCN
+        wd_mpnn: Weight decay for the base GCN
         h_feats_selective: Hidden feature dimension for the selective GCN
         n_layers_selective: Number of hidden layers for the selective GCN
         dropout_p_selective: Dropout probability for the selective GCN
@@ -400,11 +401,11 @@ def run_bridge_experiment(
         results = run_bridge_pipeline(
             g,
             P_k=P_k, 
-            h_feats_gcn=h_feats_gcn,
-            n_layers_gcn=n_layers_gcn,
-            dropout_p_gcn=dropout_p_gcn,
-            model_lr_gcn=model_lr_gcn,
-            wd_gcn=wd_gcn,
+            h_feats_mpnn=h_feats_mpnn,
+            n_layers_mpnn=n_layers_mpnn,
+            dropout_p_mpnn=dropout_p_mpnn,
+            model_lr_mpnn=model_lr_mpnn,
+            wd_mpnn=wd_mpnn,
             h_feats_selective=h_feats_selective,
             n_layers_selective=n_layers_selective,
             dropout_p_selective=dropout_p_selective,
@@ -507,15 +508,409 @@ def calculate_accuracy(pred, labels, mask, device):
     mask = mask.to(device)
     return ((pred == labels)[mask]).float().mean().item()
 
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import dgl
+import dgl.function as fn
+from dgl.nn.pytorch.conv import GATv2Conv, GINConv, SAGEConv,GraphConv
+from typing import Optional, Callable, Union
+
+class GCN(nn.Module):
+    """
+    Graph Convolutional Network (GCN) implementation.
+    
+    This implementation supports variable depth and optional residual connections.
+    
+    Args:
+        in_feats: Input feature dimension
+        h_feats: Hidden feature dimension
+        out_feats: Output feature dimension
+        n_layers: Number of hidden GCN layers
+        dropout_p: Dropout probability
+        activation: Activation function to use (default: F.relu)
+        bias: Whether to use bias in GraphConv layers
+        residual_connection: Deprecated flag for residual connections (not used in this implementation)
+        do_hp: Depreciated flag for High Pass Graph Convolution (not used in this implementation)
+    """
+    def __init__(
+        self, 
+        in_feats: int, 
+        h_feats: int, 
+        out_feats: int, 
+        n_layers: int, 
+        dropout_p: float, 
+        activation: Callable = F.relu, 
+        bias: bool = True, 
+        residual_connection: bool = False,
+        do_hp: bool = False
+    ):
+        super(GCN, self).__init__()
+        self.layers = nn.ModuleList()
+        self.activation = activation
+        self.dropout = nn.Dropout(dropout_p)
+        self.do_hp = do_hp
+        
+        # Input layer
+        self.layers.append(GraphConv(in_feats, h_feats, bias=bias, allow_zero_in_degree=True))
+        
+        # Hidden layers (if any)
+        for _ in range(n_layers - 1):
+            self.layers.append(GraphConv(h_feats, h_feats, bias=bias, allow_zero_in_degree=True))
+     
+        # Output layer
+        self.layers.append(GraphConv(h_feats, out_feats, bias=bias, allow_zero_in_degree=True))
+
+    def forward(self, g: dgl.DGLGraph, features: torch.Tensor) -> torch.Tensor:
+        """
+        Forward pass for the GCN model.
+        
+        Args:
+            g: Input graph
+            features: Node feature matrix
+            
+        Returns:
+            torch.Tensor: Node embeddings
+        """
+        h = features
+        for i, layer in enumerate(self.layers):
+            h = layer(g, h)
+            if i != len(self.layers) - 1:  # no activation & dropout on the output layer
+                h = self.activation(h)
+                h = self.dropout(h)
+        return h
+
+class GAT(nn.Module):
+    """
+    Graph Attention Network (GAT) implementation.
+    This implementation supports variable depth, multiple attention heads, and optional residual connections.
+    
+    Args:
+        in_feats: Input feature dimension
+        h_feats: Hidden feature dimension
+        out_feats: Output feature dimension
+        n_layers: Number of hidden GAT layers
+        dropout_p: Dropout probability
+        heads: Number of attention heads for hidden layers (default: 8)
+        out_heads: Number of attention heads for output layer (default: 1)
+        activation: Activation function to use (default: F.relu)
+        feat_drop: Feature dropout rate (default: 0.0)
+        attn_drop: Attention dropout rate (default: 0.0)
+        negative_slope: Negative slope for LeakyReLU (default: 0.2)
+        residual_connection: Whether to use residual connections (default: False)
+        do_hp: Deprecated flag for High Pass Graph Convolution (not used)
+    """
+    def __init__(
+        self,
+        in_feats: int,
+        h_feats: int,
+        out_feats: int,
+        n_layers: int,
+        dropout_p: float,
+        heads: int = 3,
+        out_heads: int = 1,
+        activation: Callable = F.relu,
+        feat_drop: float = 0.0,
+        attn_drop: float = 0.0,
+        negative_slope: float = 0.2,
+        residual_connection: bool = False,
+        do_hp: bool = False
+    ):
+        super(GAT, self).__init__()
+        self.layers = nn.ModuleList()
+        self.activation = activation
+        self.dropout = nn.Dropout(dropout_p)
+        self.n_layers = n_layers
+        self.heads = heads
+        self.out_heads = out_heads
+        
+        # Input layer
+        self.layers.append(GATv2Conv(
+            in_feats, h_feats, heads,
+            feat_drop=feat_drop, attn_drop=attn_drop,
+            negative_slope=negative_slope, residual=residual_connection,
+            allow_zero_in_degree=True
+        ))
+        
+        # Hidden layers (if any)
+        for _ in range(n_layers - 1):
+            self.layers.append(GATv2Conv(
+                h_feats * heads, h_feats, heads,
+                feat_drop=feat_drop, attn_drop=attn_drop,
+                negative_slope=negative_slope, residual=residual_connection,
+                allow_zero_in_degree=True
+            ))
+        
+        # Output layer
+        self.layers.append(GATv2Conv(
+            h_feats * heads, out_feats, out_heads,
+            feat_drop=feat_drop, attn_drop=attn_drop,
+            negative_slope=negative_slope, residual=False,
+            allow_zero_in_degree=True
+        ))
+
+    def forward(self, g: dgl.DGLGraph, features: torch.Tensor) -> torch.Tensor:
+        """
+        Forward pass for the GAT model.
+        
+        Args:
+            g: Input graph
+            features: Node feature matrix
+            
+        Returns:
+            torch.Tensor: Node embeddings
+        """
+        h = features
+        
+        for i, layer in enumerate(self.layers):
+            h = layer(g, h)
+            
+            if i != len(self.layers) - 1:  # not the output layer
+                # Flatten multi-head attention outputs
+                h = h.flatten(1)
+                h = self.activation(h)
+                h = self.dropout(h)
+            else:  # output layer
+                # Average attention heads for output
+                h = h.mean(1)
+                
+        return h
+
+
+class GIN(nn.Module):
+    """
+    Graph Isomorphism Network (GIN) implementation.
+    This implementation uses MLPs as the aggregation function.
+    
+    Args:
+        in_feats: Input feature dimension
+        h_feats: Hidden feature dimension
+        out_feats: Output feature dimension
+        n_layers: Number of hidden GIN layers
+        dropout: Dropout probability
+        aggregator_type: Type of aggregator ('sum', 'mean', 'max')
+        learn_eps: Whether to learn the epsilon parameter
+        activation: Activation function to use (default: F.relu)
+        residual_connection: Whether to use residual connections (default: False)
+        do_hp: Deprecated flag for High Pass Graph Convolution (not used)
+    """
+    def __init__(
+        self,
+        in_feats: int,
+        h_feats: int,
+        out_feats: int,
+        n_layers: int,
+        dropout: float,
+        aggregator_type: str = 'sum',
+        learn_eps: bool = False,
+        activation: Callable = F.relu,
+        residual_connection: bool = False,
+        do_hp: bool = False
+    ):
+        super(GIN, self).__init__()
+        self.layers = nn.ModuleList()
+        self.activation = activation
+        self.dropout = nn.Dropout(dropout)
+        self.n_layers = n_layers
+        
+        def create_mlp(input_dim, output_dim):
+            """Create a 2-layer MLP"""
+            return nn.Sequential(
+                nn.Linear(input_dim, output_dim),
+                nn.ReLU(),
+                nn.Linear(output_dim, output_dim)
+            )
+        
+        # Input layer
+        mlp = create_mlp(in_feats, h_feats)
+        self.layers.append(GINConv(
+            mlp, aggregator_type, learn_eps=learn_eps
+        ))
+        
+        # Hidden layers (if any)
+        for _ in range(n_layers - 1):
+            mlp = create_mlp(h_feats, h_feats)
+            self.layers.append(GINConv(
+                mlp, aggregator_type, learn_eps=learn_eps
+            ))
+        
+        # Output layer
+        mlp = create_mlp(h_feats, out_feats)
+        self.layers.append(GINConv(
+            mlp, aggregator_type, learn_eps=learn_eps
+        ))
+
+    def forward(self, g: dgl.DGLGraph, features: torch.Tensor) -> torch.Tensor:
+        """
+        Forward pass for the GIN model.
+        
+        Args:
+            g: Input graph
+            features: Node feature matrix
+            
+        Returns:
+            torch.Tensor: Node embeddings
+        """
+        h = features
+        
+        for i, layer in enumerate(self.layers):
+            h = layer(g, h)
+            
+            if i != len(self.layers) - 1:  # no activation & dropout on the output layer
+                h = self.activation(h)
+                h = self.dropout(h)
+                
+        return h
+
+
+class GraphSAGE(nn.Module):
+    """
+    GraphSAGE implementation.
+    This implementation supports different aggregation functions and variable depth.
+    
+    Args:
+        in_feats: Input feature dimension
+        h_feats: Hidden feature dimension
+        out_feats: Output feature dimension
+        n_layers: Number of hidden SAGE layers
+        dropout: Dropout probability
+        aggregator_type: Type of aggregator ('mean', 'mpnn', 'pool', 'lstm')
+        feat_drop: Feature dropout rate (default: 0.0)
+        bias: Whether to use bias in linear layers
+        norm: Normalization function to use (default: None)
+        activation: Activation function to use (default: F.relu)
+        residual_connection: Whether to use residual connections (default: False)
+        do_hp: Deprecated flag for High Pass Graph Convolution (not used)
+    """
+    def __init__(
+        self,
+        in_feats: int,
+        h_feats: int,
+        out_feats: int,
+        n_layers: int,
+        dropout: float,
+        aggregator_type: str = 'mean',
+        feat_drop: float = 0.0,
+        bias: bool = True,
+        norm: Optional[Callable] = None,
+        activation: Callable = F.relu,
+        residual_connection: bool = False,
+        do_hp: bool = False
+    ):
+        super(GraphSAGE, self).__init__()
+        self.layers = nn.ModuleList()
+        self.activation = activation
+        self.dropout = nn.Dropout(dropout)
+        self.n_layers = n_layers
+        
+        # Input layer
+        self.layers.append(SAGEConv(
+            in_feats, h_feats, aggregator_type,
+            feat_drop=feat_drop, bias=bias, norm=norm
+        ))
+        
+        # Hidden layers (if any)
+        for _ in range(n_layers - 1):
+            self.layers.append(SAGEConv(
+                h_feats, h_feats, aggregator_type,
+                feat_drop=feat_drop, bias=bias, norm=norm
+            ))
+        
+        # Output layer
+        self.layers.append(SAGEConv(
+            h_feats, out_feats, aggregator_type,
+            feat_drop=feat_drop, bias=bias, norm=norm
+        ))
+
+    def forward(self, g: dgl.DGLGraph, features: torch.Tensor) -> torch.Tensor:
+        """
+        Forward pass for the GraphSAGE model.
+        
+        Args:
+            g: Input graph
+            features: Node feature matrix
+            
+        Returns:
+            torch.Tensor: Node embeddings
+        """
+        h = features
+        
+        for i, layer in enumerate(self.layers):
+            h = layer(g, h)
+            
+            if i != len(self.layers) - 1:  # no activation & dropout on the output layer
+                h = self.activation(h)
+                h = self.dropout(h)
+                
+        return h
+
+
+# Updated factory function to work with the new models
+def create_model(model_type: str, in_feats: int, h_feats: int, out_feats: int, 
+                 n_layers: int, dropout_p: float, do_residual_connections: bool = False, 
+                 do_hp: bool = False, device: str = 'cpu'):
+    """
+    Factory function to create different model types.
+    
+    Args:
+        model_type: Type of model ('GCN', 'GAT', 'GIN', 'GraphSAGE')
+        in_feats: Input feature dimension
+        h_feats: Hidden feature dimension
+        out_feats: Output feature dimension
+        n_layers: Number of layers
+        dropout_p: Dropout probability
+        do_residual_connections: Whether to use residual connections
+        do_hp: Whether to use high-pass filters
+        device: Device to place model on
+    
+    Returns:
+        Model instance
+    """
+    model_type = model_type.upper()
+    
+    if model_type == 'GCN':
+        model = GCN(
+            in_feats, h_feats, out_feats, n_layers,
+            dropout_p, residual_connection=do_residual_connections, do_hp=do_hp
+        ).to(device)
+    
+    elif model_type == 'GAT':
+        # GAT typically uses attention heads
+        num_heads = 3 if n_layers > 1 else 1  # Use multiple heads for hidden layers
+        model = GAT(
+            in_feats, h_feats, out_feats, n_layers,
+            dropout_p, heads=num_heads, 
+            residual_connection=do_residual_connections, do_hp=do_hp
+        ).to(device)
+    
+    elif model_type == 'GIN':
+        model = GIN(
+            in_feats, h_feats, out_feats, n_layers,
+            dropout=dropout_p, residual_connection=do_residual_connections, do_hp=do_hp
+        ).to(device)
+    
+    elif model_type == 'GRAPHSAGE':
+        model = GraphSAGE(
+            in_feats, h_feats, out_feats, n_layers,
+            dropout=dropout_p, aggregator_type='mean',
+            residual_connection=do_residual_connections, do_hp=do_hp
+        ).to(device)
+    
+    else:
+        raise ValueError(f"Unsupported model type: {model_type}. "
+                        f"Supported types: GCN, GAT, GIN, GRAPHSAGE")
+    
+    return model
 
 def run_iterative_bridge_pipeline(
     g: dgl.DGLGraph,
     P_k: np.ndarray,
-    h_feats_gcn: int = 64,
-    n_layers_gcn: int = 2,
-    dropout_p_gcn: float = 0.5,
-    model_lr_gcn: float = 1e-3,
-    wd_gcn: float = 0.0,
+    model_type: str = 'GCN',  # New parameter for model type
+    h_feats_mpnn: int = 64,
+    n_layers_mpnn: int = 2,
+    dropout_p_mpnn: float = 0.5,
+    model_lr_mpnn: float = 1e-3,
+    wd_mpnn: float = 0.0,
     h_feats_selective: int = 64,
     n_layers_selective: int = 2,
     dropout_p_selective: float = 0.5,
@@ -549,25 +944,26 @@ def run_iterative_bridge_pipeline(
     Run an iterative version of the BRIDGE pipeline that performs multiple rounds of rewiring.
     
     This function repeatedly:
-    1. Classifies nodes using a fast SGC model for the first iteration
-    2. For subsequent iterations, uses a SelectiveSGC model on both the original and current rewired graph
+    1. Classifies nodes using a specified model type for the first iteration
+    2. For subsequent iterations, uses the same model type on both the original and current rewired graph
     3. Rewires the graph based on the predicted classes
     4. Repeats the process n_rewire times
-    5. Trains a final selective GCN on the original and final rewired graph
+    5. Trains a final selective model on the original and final rewired graph
     
     Args:
         g: Input graph
         P_k: Permutation matrix for rewiring
-        h_feats_gcn: Hidden feature dimension for the base GCN
-        n_layers_gcn: Number of hidden layers for the base GCN
-        dropout_p_gcn: Dropout probability for the base GCN
-        model_lr_gcn: Learning rate for the base GCN
-        wd_gcn: Weight decay for the base GCN
-        h_feats_selective: Hidden feature dimension for the selective GCN
-        n_layers_selective: Number of hidden layers for the selective GCN
-        dropout_p_selective: Dropout probability for the selective GCN
-        model_lr_selective: Learning rate for the selective GCN
-        wd_selective: Weight decay for the selective GCN
+        model_type: Type of model to use ('GCN', 'GAT', 'GIN', 'GraphSAGE')
+        h_feats_mpnn: Hidden feature dimension for the base model
+        n_layers_mpnn: Number of hidden layers for the base model
+        dropout_p_mpnn: Dropout probability for the base model
+        model_lr_mpnn: Learning rate for the base model
+        wd_mpnn: Weight decay for the base model
+        h_feats_selective: Hidden feature dimension for the selective model
+        n_layers_selective: Number of hidden layers for the selective model
+        dropout_p_selective: Dropout probability for the selective model
+        model_lr_selective: Learning rate for the selective model
+        wd_selective: Weight decay for the selective model
         n_epochs: Maximum number of training epochs
         early_stopping: Number of epochs to look back for early stopping
         temperature: Temperature for softmax when computing class probabilities
@@ -585,7 +981,7 @@ def run_iterative_bridge_pipeline(
         do_hp: Whether to use high-pass filters
         do_self_loop: Whether to add self-loops
         do_residual_connections: Whether to use residual connections
-        use_sgc: Whether to use SGC for classification (faster) or standard GCN
+        use_sgc: Whether to use SGC for classification (faster) or standard model
         n_rewire: Number of rewiring iterations
         sgc_K: Number of propagation steps for SGC
         sgc_lr: Learning rate specifically for the SGC model in first iteration
@@ -596,8 +992,8 @@ def run_iterative_bridge_pipeline(
         
     Returns:
         Dict[str, Any]: Results of the rewiring pipeline, including:
-            - cold_start: Results for the base GCN
-            - selective: Results for the selective GCN
+            - cold_start: Results for the base model
+            - selective: Results for the selective model
             - original_stats: Statistics for the original graph
             - rewired_stats: Statistics for the rewired graph
             - rewiring_history: Statistics at each rewiring step
@@ -617,21 +1013,22 @@ def run_iterative_bridge_pipeline(
     val_mask = val_mask if val_mask is not None else g.ndata['val_mask'].bool()
     test_mask = test_mask if test_mask is not None else g.ndata['test_mask'].bool()
 
-    # Store original graph for final training and selective SGC
+    # Store original graph for final training and selective model
     g_original = g.clone()
     
-    # Keep track of statistics over all iterations
-    rewiring_history = []
+    # Log model type being used
+    if log_training:
+        print(f"Using model type: {model_type.upper()}")
     
     ########################################################################
     # 1) Log Original Graph Statistics
     ########################################################################
 
-    def compute_graph_stats(graph):
+    def compute_graph_stats(graph,l):
         num_nodes = graph.num_nodes()
         num_edges = graph.num_edges()
         mean_degree = graph.in_degrees().float().mean().item()
-        mean_local_homophily = local_homophily(n_layers_selective+1, graph, do_hp=do_hp).mean().item()
+        mean_local_homophily = local_homophily(l, graph, do_hp=do_hp).mean().item()
         stats = {
             'num_nodes': num_nodes,
             'num_edges': num_edges,
@@ -640,7 +1037,7 @@ def run_iterative_bridge_pipeline(
         }
         return stats
 
-    original_stats = compute_graph_stats(g)
+    original_stats = compute_graph_stats(g, n_layers_mpnn + 1)
     
     if log_training:
         print(f"Original Graph Stats: {original_stats}")
@@ -655,9 +1052,15 @@ def run_iterative_bridge_pipeline(
     ########################################################################
     # 2) Iterative Rewiring Process
     ########################################################################
-
+    
+    # Keep track of statistics over all iterations
+    rewiring_history = []
+    train_acc_list = []
+    val_acc_list = []
+    test_acc_list = []
+    
     for iter_idx in range(n_rewire):
-        if iter_idx == 0 and simulated_acc is not None:
+        if simulated_acc is not None:
             # Add label noise for troubleshooting
             # simulated_acc represents the accuracy (1 - noise_fraction*(1-1/k))
             # noise will be right 1/k of the time, so need to adjust noise_fraction accordingly
@@ -681,118 +1084,79 @@ def run_iterative_bridge_pipeline(
             Z_pred = torch.zeros(n_nodes, out_feats, device=device)
             Z_pred.scatter_(1, pred.unsqueeze(1), 1.0)
             
-            # Calculate and log accuracy
-            pred_accuracy = calculate_accuracy(pred, labels, test_mask, device)
-            
-            train_acc_cold = calculate_accuracy(pred, labels, train_mask, device)
-            val_acc_cold = calculate_accuracy(pred, labels, val_mask, device)
-            test_acc_cold = calculate_accuracy(pred, labels, test_mask, device)
-            
             if log_training:
                 print(f"Added {noise_mask.sum().item()} noisy labels in iteration {iter_idx+1} "
                       f"(accuracy: {simulated_acc:.2f})")
         
-        # For first iteration, use standard SGC
-        elif iter_idx == 0 and use_sgc:
-            # # Use fast SGC for first classification with custom hyperparameters
-            # model = SGC(in_feats, out_feats, K=sgc_K).to(device)
-            
-            # train_acc_cold, val_acc_cold, test_acc_cold, model = train(
-            #     g,
-            #     model,
-            #     train_mask,
-            #     val_mask,
-            #     test_mask,
-            #     model_lr=sgc_lr,
-            #     optimizer_weight_decay=sgc_wd,
-            #     n_epochs=n_epochs,
-            #     early_stopping=early_stopping,
-            #     log_training=log_training,
-            #     metric_type=get_metric_type(dataset_name)
-            # )
-            
-            model = GCN(
-            in_feats, h_feats_gcn, out_feats, n_layers_gcn,
-            dropout_p_gcn, residual_connection=do_residual_connections, do_hp=do_hp
-            ).to(device)
+        else:
+            if iter_idx == 0:
+                # Create model using the specified model type
+                model = create_model(
+                    model_type=model_type,
+                    in_feats=in_feats,
+                    h_feats=h_feats_mpnn,
+                    out_feats=out_feats,
+                    n_layers=n_layers_mpnn,
+                    dropout_p=dropout_p_mpnn,
+                    do_residual_connections=do_residual_connections,
+                    do_hp=do_hp,
+                    device=device
+                )
 
-            train_acc_cold, val_acc_cold, test_acc_cold, model = train(
-            g,
-            model,
-            train_mask,
-            val_mask,
-            test_mask,
-            model_lr=model_lr_gcn,
-            optimizer_weight_decay=wd_gcn,
-            n_epochs=n_epochs,
-            early_stopping=early_stopping,
-            log_training=log_training,
-            metric_type=get_metric_type(dataset_name)
-            )
+                train_acc_cold, val_acc_cold, test_acc_cold, model = train(
+                    g_rewired.to(device),
+                    model,
+                    train_mask,
+                    val_mask,
+                    test_mask,
+                    model_lr=model_lr_mpnn,
+                    optimizer_weight_decay=wd_mpnn,
+                    n_epochs=n_epochs,
+                    early_stopping=early_stopping,
+                    log_training=log_training,
+                    metric_type=get_metric_type(dataset_name)
+                )
+            else:
+                # Create model using the specified model type with selective parameters
+                model = create_model(
+                    model_type=model_type,
+                    in_feats=in_feats,
+                    h_feats=h_feats_selective,
+                    out_feats=out_feats,
+                    n_layers=n_layers_selective,
+                    dropout_p=dropout_p_selective,
+                    do_residual_connections=do_residual_connections,
+                    do_hp=do_hp,
+                    device=device
+                )
+
+                _, _, _, model = train(
+                    g_rewired.to(device),
+                    model,
+                    train_mask,
+                    val_mask,
+                    test_mask,
+                    model_lr=model_lr_selective,
+                    optimizer_weight_decay=wd_selective,
+                    n_epochs=n_epochs,
+                    early_stopping=early_stopping,
+                    log_training=log_training,
+                    metric_type=get_metric_type(dataset_name)
+                )
+            
                 
             # Get predicted class distribution
             model.eval()
             with torch.no_grad():
-                logits = model(g_rewired, feat)
-                #Z_pred = F.softmax(logits / temperature, dim=1)  # shape: [n_nodes, out_feats]
+                logits = model(g_rewired.to(device), feat.to(device))
                 # Create corresponding Z_pred (one-hot encoding)
                 pred = logits.argmax(dim=1)  
                 Z_pred = torch.zeros(n_nodes, out_feats, device=device)
                 Z_pred.scatter_(1, pred.unsqueeze(1), 1.0)
-                                    # [n_nodes]
         
-            # Calculate and log accuracy
-            pred_accuracy = calculate_accuracy(pred, labels, test_mask, device)
-
-        # For subsequent iterations, use SelectiveSGC on both original and rewired graph
-        else:
-            # Prepare graph list for selective SGC
-            g_list = [g_original.to(device), g_rewired.to(device)]
-            
-            # Compute local homophily for each graph
-            lh_list = []
-            for i, g_i in enumerate(g_list):
-                lh_tensor = local_homophily(
-                    sgc_K+1, g_i.to(device), y=pred.to(device) if iter_idx == 0 else pred.to(device), do_hp=do_hp
-                )
-                lh_list.append(lh_tensor)
-
-            lh_stack = torch.stack(lh_list)
-            node_mask = lh_stack.argmax(dim=0)  # for each node, which graph is better?
-
-            for g_i in g_list:
-                g_i.ndata['mask'] = node_mask.to(device)
-                
-            # Use SelectiveSGC for classification
-            model = SelectiveGCN(in_feats, h_feats_selective, out_feats,
-                                n_layers_selective, dropout_p_selective,
-                                residual_connection=do_residual_connections, 
-                                do_hp=do_hp).to(device)
-            
-            train_acc_sel, val_acc_sel, test_acc_sel, model = train_selective(
-                g_list,
-                model,
-                train_mask,
-                val_mask,
-                test_mask,
-                model_lr=model_lr_selective,
-                optimizer_weight_decay=wd_selective,
-                n_epochs=n_epochs,
-                early_stopping=early_stopping,
-                log_training=log_training,
-                metric_type=get_metric_type(dataset_name)
-            )
-            # Get predicted class distribution
-            model.eval()
-            with torch.no_grad():
-                logits = model(g_list, feat)
-                pred = logits.argmax(dim=1)  
-                Z_pred = torch.zeros(n_nodes, out_feats, device=device)
-                Z_pred.scatter_(1, pred.unsqueeze(1), 1.0)
-                
-            # Calculate and log accuracy
-            pred_accuracy = calculate_accuracy(pred, labels, test_mask, device)
-
+        train_acc = calculate_accuracy(pred, labels, train_mask, device)
+        val_acc = calculate_accuracy(pred, labels, val_mask, device)
+        test_acc = calculate_accuracy(pred, labels, test_mask, device)
 
         # Ensure no empty classes: if any class is empty, fill it artificially
         unique_counts = pred.bincount(minlength=out_feats)
@@ -805,7 +1169,7 @@ def run_iterative_bridge_pipeline(
         ########################################################################
 
         pi = Z_pred.cpu().numpy().sum(0) / n_nodes
-        Pi_inv = np.diag(1/pi)
+        Pi_inv = np.diag(1/(pi+1e-8))
         B_opt = (d_out/k) * Pi_inv @ P_k @ Pi_inv
         B_opt_tensor = torch.tensor(B_opt, dtype=torch.float32, device=device)
         
@@ -845,93 +1209,27 @@ def run_iterative_bridge_pipeline(
         edges_added = ((A_new > 0.5) & (A_old < 0.5)).sum().item()
         edges_removed = ((A_new < 0.5) & (A_old > 0.5)).sum().item()
         
-        current_stats = compute_graph_stats(g_rewired)
+        current_stats = compute_graph_stats(g_rewired, n_layers_selective + 1)
         current_stats.update({
             'edges_added': edges_added,
             'edges_removed': edges_removed,
             'iteration': iter_idx + 1,
-            'pred_accuracy': pred_accuracy
+            'train_accuracy': copy.deepcopy(train_acc),
+            'test_accuracy': copy.deepcopy(test_acc),
+            'val_accuracy': copy.deepcopy(val_acc),
         })
         
-        rewiring_history.append(current_stats)
+        rewiring_history.append(copy.deepcopy(current_stats))
+        train_acc_list.append(copy.deepcopy(train_acc))
+        val_acc_list.append(copy.deepcopy(val_acc))
+        test_acc_list.append(copy.deepcopy(test_acc))
         
         if log_training:
-            print(f"Iteration {iter_idx+1} Stats: Pred Accuracy: {pred_accuracy:.4f}, "
-                  f"Mean Homophily: {current_stats['mean_local_homophily']:.4f}, "
-                  f"Edges: {current_stats['num_edges']}, "
-                  f"Added: {edges_added}, Removed: {edges_removed}")
-            
-    ########################################################################
-    # 4) Final Selective GCN Training with Original and Final Rewired Graph
-    ########################################################################
-    # Prepare graph list for selective GCN
-    g_list = [g_original.to(device), g_rewired.to(device)]
+            print(f"Iteration {iter_idx+1} Stats ({model_type}): Test Accuracy: {test_acc:.4f}, "
+                f"Mean Homophily: {current_stats['mean_local_homophily']:.4f}, "
+                f"Edges: {current_stats['num_edges']}, "
+                f"Added: {edges_added}, Removed: {edges_removed}")
     
-    # Compute local homophily for each graph, using true labels
-    lh_list = []
-    for i, g_i in enumerate(g_list):
-        lh_tensor = local_homophily(
-            n_layers_selective+1, g_i.to(device), y=pred.to(device), do_hp=do_hp
-        )
-        lh_list.append(lh_tensor)
-
-    lh_stack = torch.stack(lh_list)
-    node_mask = lh_stack.argmax(dim=0)  # for each node, which graph is better?
-
-    for g_i in g_list:
-        g_i.ndata['mask'] = node_mask.to(device)
-    
-    final_rewired_stats = compute_graph_stats(g_rewired)
-    final_rewired_stats.update({
-        'edges_added': edges_added,
-        'edges_removed': edges_removed,
-        'selective_mask': str(node_mask.bincount(minlength=len(g_list)).cpu().numpy())
-    })
-    
-    # ########################################################################
-    # # 5) Train Cold-Start GCN on Original Graph
-    # ########################################################################
-    # model_cold = GCN(
-    #     in_feats, h_feats_gcn, out_feats, n_layers_gcn,
-    #     dropout_p_gcn, residual_connection=do_residual_connections, do_hp=do_hp
-    # ).to(device)
-    
-    # train_acc_cold, val_acc_cold, test_acc_cold, model_cold = train(
-    #     g_original,
-    #     model_cold,
-    #     train_mask,
-    #     val_mask,
-    #     test_mask,
-    #     model_lr=model_lr_gcn,
-    #     optimizer_weight_decay=wd_gcn,
-    #     n_epochs=n_epochs,
-    #     early_stopping=early_stopping,
-    #     log_training=log_training,
-    #     metric_type=get_metric_type(dataset_name)
-    # )
-    
-    ########################################################################
-    # 6) Train Selective GCN on Original and Final Rewired Graph
-    ########################################################################
-    model_selective = SelectiveGCN(
-        in_feats, h_feats_selective, out_feats,
-        n_layers_selective, dropout_p_selective,
-        residual_connection=do_residual_connections, do_hp=do_hp
-    ).to(device)
-
-    train_acc_sel, val_acc_sel, test_acc_sel, model_selective = train_selective(
-        g_list,
-        model_selective,
-        train_mask,
-        val_mask,
-        test_mask,
-        model_lr=model_lr_selective,
-        optimizer_weight_decay=wd_selective,
-        n_epochs=n_epochs,
-        early_stopping=early_stopping,
-        log_training=log_training,
-        metric_type=get_metric_type(dataset_name)
-    )
 
     # Compile results
     results = {
@@ -941,13 +1239,14 @@ def run_iterative_bridge_pipeline(
             'test_acc': test_acc_cold,
         },
         'selective': {
-            'train_acc': train_acc_sel,
-            'val_acc': val_acc_sel,
-            'test_acc': test_acc_sel,
+            'train_acc': train_acc,
+            'val_acc': val_acc,
+            'test_acc': test_acc,
         },
         'original_stats': original_stats,
-        'rewired_stats': final_rewired_stats,
-        'rewiring_history': rewiring_history
+        'rewired_stats': current_stats,
+        'rewiring_history': rewiring_history,
+        'model_type': model_type  # Add model type to results
     }
     return results
 
@@ -955,11 +1254,12 @@ def run_iterative_bridge_pipeline(
 def run_iterative_bridge_experiment(
     g: dgl.DGLGraph,
     P_k: np.ndarray,
-    h_feats_gcn: int = 64,
-    n_layers_gcn: int = 2,
-    dropout_p_gcn: float = 0.5,
-    model_lr_gcn: float = 1e-3,
-    wd_gcn: float = 0.0,
+    model_type: str = 'GCN',  # New parameter for model type
+    h_feats_mpnn: int = 64,
+    n_layers_mpnn: int = 2,
+    dropout_p_mpnn: float = 0.5,
+    model_lr_mpnn: float = 1e-3,
+    wd_mpnn: float = 0.0,
     h_feats_selective: int = 64,
     n_layers_selective: int = 2,
     dropout_p_selective: float = 0.5,
@@ -996,16 +1296,17 @@ def run_iterative_bridge_experiment(
     Args:
         g: Input graph
         P_k: Permutation matrix for rewiring
-        h_feats_gcn: Hidden feature dimension for the base GCN
-        n_layers_gcn: Number of hidden layers for the base GCN
-        dropout_p_gcn: Dropout probability for the base GCN
-        model_lr_gcn: Learning rate for the base GCN
-        wd_gcn: Weight decay for the base GCN
-        h_feats_selective: Hidden feature dimension for the selective GCN
-        n_layers_selective: Number of hidden layers for the selective GCN
-        dropout_p_selective: Dropout probability for the selective GCN
-        model_lr_selective: Learning rate for the selective GCN
-        wd_selective: Weight decay for the selective GCN
+        model_type: Type of model to use ('GCN', 'GAT', 'GIN', 'GraphSAGE')
+        h_feats_mpnn: Hidden feature dimension for the base model
+        n_layers_mpnn: Number of hidden layers for the base model
+        dropout_p_mpnn: Dropout probability for the base model
+        model_lr_mpnn: Learning rate for the base model
+        wd_mpnn: Weight decay for the base model
+        h_feats_selective: Hidden feature dimension for the selective model
+        n_layers_selective: Number of hidden layers for the selective model
+        dropout_p_selective: Dropout probability for the selective model
+        model_lr_selective: Learning rate for the selective model
+        wd_selective: Weight decay for the selective model
         n_epochs: Maximum number of training epochs
         early_stopping: Number of epochs to look back for early stopping
         temperature: Temperature for softmax when computing class probabilities
@@ -1020,7 +1321,7 @@ def run_iterative_bridge_experiment(
         do_hp: Whether to use high-pass filters
         do_self_loop: Whether to add self-loops
         do_residual_connections: Whether to use residual connections
-        use_sgc: Whether to use SGC for classification (faster) or standard GCN
+        use_sgc: Whether to use SGC for classification (faster) or standard model
         n_rewire: Number of rewiring iterations
         sgc_K: Number of propagation steps for SGC
         sgc_lr: Learning rate specifically for the SGC model in first iteration
@@ -1069,12 +1370,13 @@ def run_iterative_bridge_experiment(
             
         results = run_iterative_bridge_pipeline(
             g,
-            P_k=P_k, 
-            h_feats_gcn=h_feats_gcn,
-            n_layers_gcn=n_layers_gcn,
-            dropout_p_gcn=dropout_p_gcn,
-            model_lr_gcn=model_lr_gcn,
-            wd_gcn=wd_gcn,
+            P_k=P_k,
+            model_type=model_type,  # Pass model type
+            h_feats_mpnn=h_feats_mpnn,
+            n_layers_mpnn=n_layers_mpnn,
+            dropout_p_mpnn=dropout_p_mpnn,
+            model_lr_mpnn=model_lr_mpnn,
+            wd_mpnn=wd_mpnn,
             h_feats_selective=h_feats_selective,
             n_layers_selective=n_layers_selective,
             dropout_p_selective=dropout_p_selective,
@@ -1147,6 +1449,7 @@ def run_iterative_bridge_experiment(
     
     # Format the output
     formatted_stats = {
+        'model_type': model_type,  # Add model type to results
         'test_acc_mean': stats_dict['test_acc']['mean'],
         'test_acc_ci': stats_dict['test_acc']['ci'],
         'val_acc_mean': stats_dict['val_acc']['mean'],

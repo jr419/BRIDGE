@@ -346,13 +346,13 @@ from pathlib import Path
 MAIN_DATASETS = ["cora", "citeseer", "pubmed",'actor', 'squirrel', 'chameleon']
 OTHER_DATASETS = ['wisconsin', 'cornell', 'texas']
 SYNTHETIC_DATASETS = [
-    'synthetic_graph_dataset_h=0.10_d=20.00',
-    'synthetic_graph_dataset_h=0.20_d=20.00',
-    'synthetic_graph_dataset_h=0.30_d=20.00',
-    'synthetic_graph_dataset_h=0.40_d=20.00',
-    'synthetic_graph_dataset_h=0.50_d=20.00',
-    'synthetic_graph_dataset_h=0.60_d=20.00',
-    'synthetic_graph_dataset_h=0.70_d=20.00'
+    'synthetic_graph_dataset_h=0.35_d=10.00',
+    'synthetic_graph_dataset_h=0.40_d=10.00',
+    'synthetic_graph_dataset_h=0.45_d=10.00',
+    'synthetic_graph_dataset_h=0.50_d=10.00',
+    'synthetic_graph_dataset_h=0.55_d=10.00',
+    'synthetic_graph_dataset_h=0.60_d=10.00',
+    'synthetic_graph_dataset_h=0.65_d=10.00'
 ]
 
 import os
@@ -496,9 +496,9 @@ Model & {header_columns} \\\\
     for model_name, model_data in models_data.items():
         base_row = [f"{model_name} (Base)"]
         rewired_row = [f"{model_name} (Rewired)"]
-        
         for dataset in dataset_list:
             entry = model_data.get(dataset, {})
+            print(dataset,model_data)
             if entry:
                 # ----- Base (never coloured) -----
                 base_row.append(
@@ -542,17 +542,18 @@ def main():
     # Define model folders - adjust these paths to your actual data locations
     model_folders = [
         #('High-Pass GCN', 'results/rewiring/no_self_loop_yes_hp_fixed_n_layers_2025-03-20-09-32-06'),
-        ('Single Rewiring', 'results/rewiring/large_run_no_hp_2025-05-07-14-01-06'),
-        ('Short Rewiring', 'results/rewiring/incremental_iterative_selective_rewiring_full_2025-05-02-13-04-15'),
-        ('Iterative Rewiring', 'results/rewiring/long_rewiring_download'),
-        ('Full Block Rewiring', 'results/rewiring/full_block_rewiring_2025-05-12-14-11-54')
+        # ('Single Rewiring', 'results/rewiring/large_run_no_hp_2025-05-07-14-01-06'),
+        # ('Short Rewiring', 'results/rewiring/incremental_iterative_selective_rewiring_full_2025-05-02-13-04-15'),
+        # ('Iterative Rewiring', 'results/rewiring/long_rewiring_download'),
+        # ('Full Block Rewiring', 'results/rewiring/full_block_rewiring_2025-05-12-14-11-54')
+        ('GCN','results/rewiring/final_synthetic_data_collection')
     ]
     
     # Parse results for each folder
     models_data = {}
     for display_name, folder in model_folders:
         models_data[display_name] = parse_results_for_model(folder)
-
+    print(models_data)
     # Build tables
     main_table = build_table(
         models_data,
@@ -575,7 +576,7 @@ def main():
         SYNTHETIC_DATASETS,
         "Model Performance Before and After Rewiring (Planted Partition SBM Datasets)",
         "tab:accuracies_synthetic",
-        ["h=0.10", "h=0.20", "h=0.30", "h=0.40", "h=0.50", "h=0.60", "h=0.70"]
+        ["h=0.35", "h=0.40", "h=0.45", "h=0.50", "h=0.55", "h=0.60", "h=0.65"]
     )
     
     # Print the resulting LaTeX

@@ -16,7 +16,7 @@ from scipy import stats
 from ..models import GCN
 from ..training import train, get_metric_type
 from ..utils import set_seed, compute_confidence_interval
-from ..rewiring import run_bridge_experiment, run_iterative_bridge_experiment
+from ..rewiring import run_bridge_experiment, run_iterative_bridge_experiment, create_model
 
 
 # def trial_suggest_or_fixed(
@@ -94,7 +94,7 @@ def trial_suggest_or_fixed(
 
 
 
-def train_and_evaluate_gcn(
+def train_and_evaluate_mpnn(
     g: dgl.DGLGraph,
     h_feats: int,
     n_layers: int,
@@ -106,6 +106,7 @@ def train_and_evaluate_gcn(
     device: Union[str, torch.device] = 'cpu',
     num_splits: int = 100,
     log_training: bool = False,
+    model_type: str = 'GCN',
     do_hp: bool = False,
     do_self_loop: bool = False,
     do_residual_connections: bool = False,
@@ -126,6 +127,7 @@ def train_and_evaluate_gcn(
         device: Device to perform computations on
         num_splits: Number of times to repeat the experiment
         log_training: Whether to print training progress
+        model_type: Type of model to use (default: 'GCN')
         do_hp: Whether to use higher-order polynomial filters
         do_self_loop: Whether to add self-loops
         do_residual_connections: Whether to use residual connections
@@ -173,11 +175,18 @@ def train_and_evaluate_gcn(
         # Initialize model
         in_feats = g.ndata['feat'].shape[1]
         out_feats = int(g.ndata['label'].max().item()) + 1
-        model = GCN(
-            in_feats, h_feats, out_feats, n_layers, dropout_p, 
-            residual_connection=do_residual_connections,
-            do_hp=do_hp
-        ).to(device)
+        model = create_model(
+                    model_type=model_type,
+                    in_feats=in_feats,
+                    h_feats=h_feats,
+                    out_feats=out_feats,
+                    n_layers=n_layers,
+                    dropout_p=dropout_p,
+                    do_residual_connections=do_residual_connections,
+                    do_hp=do_hp,
+                    device=device
+                )
+        
 
         # Train model
         train_acc, val_acc, test_acc, _ = train(
@@ -227,13 +236,14 @@ def train_and_evaluate_gcn(
     )
 
 
-def objective_gcn(
+def objective_mpnn(
     trial: optuna.Trial,
     g: dgl.DGLGraph,
     device: Union[str, torch.device] = 'cpu',
     n_epochs: int = 1000,
     num_splits: int = 100,
     early_stopping: int = 50,
+    model_type: str = 'GCN',
     do_hp: bool = False,
     do_residual_connections: bool = False,
     dataset_name: str = 'unknown',
@@ -251,7 +261,9 @@ def objective_gcn(
         g: Input graph
         device: Device to perform computations on
         n_epochs: Maximum number of training epochs
+        num_splits: Number of splits/repetitions for statistical significance
         early_stopping: Number of epochs to look back for early stopping
+        model_type: Type of model to use (default: 'mpnn')
         do_hp: Whether to use higher-order polynomial filters
         do_residual_connections: Whether to use residual connections
         dataset_name: Name of the dataset
@@ -320,12 +332,13 @@ def objective_gcn(
     }
     
     # Train and evaluate
-    train_acc, val_acc, test_acc, train_acc_ci, val_acc_ci, test_acc_ci = train_and_evaluate_gcn(
+    train_acc, val_acc, test_acc, train_acc_ci, val_acc_ci, test_acc_ci = train_and_evaluate_mpnn(
         g=g,
         device=device,
         num_splits=num_splits,
         n_epochs=n_epochs,
         early_stopping=early_stopping,
+        model_type=model_type,
         do_hp=do_hp,
         do_residual_connections=do_residual_connections,
         dataset_name=dataset_name,
@@ -387,12 +400,13 @@ def collect_float_metrics(results_list: List[Dict[str, Any]]) -> Dict[str, Dict[
 def objective_rewiring(
     trial: optuna.Trial,
     g: dgl.DGLGraph,
-    best_gcn_params: Dict[str, Any],
+    best_mpnn_params: Dict[str, Any],
     all_matrices: List[np.ndarray],
     device: Union[str, torch.device] = 'cpu',
     n_epochs: int = 1000,
     num_splits: int = 100,
     early_stopping: int = 50,
+    model_type: str = 'GCN',
     do_hp: bool = False,
     do_self_loop: bool = False,
     do_residual_connections: bool = False,
@@ -416,11 +430,13 @@ def objective_rewiring(
     Args:
         trial: Optuna trial object
         g: Input graph
-        best_gcn_params: Best hyperparameters for the base GCN
+        best_mpnn_params: Best hyperparameters for the base GCN
         all_matrices: List of permutation matrices to consider
         device: Device to perform computations on
         n_epochs: Maximum number of training epochs
+        num_splits: Number of splits/repetitions for statistical significance
         early_stopping: Number of epochs to look back for early stopping
+        model_type: Type of model to use (default: 'mpnn')
         do_hp: Whether to use higher-order polynomial filters
         do_self_loop: Whether to add self-loops
         do_residual_connections: Whether to use residual connections
@@ -443,7 +459,7 @@ def objective_rewiring(
     wd_selective_range = wd_selective_range or [1e-6, 1e-3]
     
     # Sample hyperparameters (including the permutation matrix index)
-    fixed_matrix_datasets = ["cora", "citeseer"]
+    fixed_matrix_datasets = []#"cora", "citeseer"]
     
     if dataset_name.lower() in fixed_matrix_datasets:
         matrix_idx = 0
@@ -459,11 +475,11 @@ def objective_rewiring(
     num_graphs = 1
     
     # Use best GCN parameters for cold-start GCN
-    h_feats_gcn = best_gcn_params.get('h_feats', 64)
-    n_layers_gcn = best_gcn_params.get('n_layers', 1)
-    dropout_p_gcn = best_gcn_params.get('dropout_p',0.5)
-    model_lr_gcn = best_gcn_params.get('model_lr',1e-3)
-    wd_gcn = best_gcn_params.get('weight_decay',1e-5)
+    h_feats_mpnn = best_mpnn_params.get('h_feats', 64)
+    n_layers_mpnn = best_mpnn_params.get('n_layers', 1)
+    dropout_p_mpnn = best_mpnn_params.get('dropout_p',0.5)
+    model_lr_mpnn = best_mpnn_params.get('model_lr',1e-3)
+    wd_mpnn = best_mpnn_params.get('weight_decay',1e-5)
 
     # Sample parameters for selective GCN
     h_feats_sel = trial.suggest_categorical('h_feats_selective', h_feats_selective_options)
@@ -477,11 +493,12 @@ def objective_rewiring(
     stats_dict, results_list = run_bridge_experiment(
         g,
         P_k=P_k,
-        h_feats_gcn=h_feats_gcn,
-        n_layers_gcn=n_layers_gcn,
-        dropout_p_gcn=dropout_p_gcn,
-        model_lr_gcn=model_lr_gcn,
-        wd_gcn=wd_gcn,
+        model_type=model_type,
+        h_feats_mpnn=h_feats_mpnn,
+        n_layers_mpnn=n_layers_mpnn,
+        dropout_p_mpnn=dropout_p_mpnn,
+        model_lr_mpnn=model_lr_mpnn,
+        wd_mpnn=wd_mpnn,
         h_feats_selective=h_feats_sel,
         n_layers_selective=n_layers_sel,
         dropout_p_selective=dropout_p_sel,
@@ -532,12 +549,13 @@ def objective_rewiring(
 def objective_iterative_rewiring(
     trial: optuna.Trial,
     g: dgl.DGLGraph,
-    best_gcn_params: Dict[str, Any],
+    best_mpnn_params: Dict[str, Any],
     all_matrices: List[np.ndarray],
     device: Union[str, torch.device] = 'cpu',
     n_epochs: int = 1000,
     num_splits: int = 100,
     early_stopping: int = 50,
+    model_type: str = 'GCN',
     do_hp: bool = False,
     do_self_loop: bool = False,
     do_residual_connections: bool = False,
@@ -566,12 +584,13 @@ def objective_iterative_rewiring(
     Args:
         trial: Optuna trial object
         g: Input graph
-        best_gcn_params: Best hyperparameters for the base GCN
+        best_mpnn_params: Best hyperparameters for the base GCN
         all_matrices: List of permutation matrices to consider
         device: Device to perform computations on
         n_epochs: Maximum number of training epochs
         num_splits: Number of splits/repetitions for statistical significance
         early_stopping: Number of epochs to look back for early stopping
+        model_type: Type of model to use (default: 'mpnn')
         do_hp: Whether to use higher-order polynomial filters
         do_self_loop: Whether to add self-loops
         do_residual_connections: Whether to use residual connections
@@ -617,7 +636,7 @@ def objective_iterative_rewiring(
         param_type="int"
     )
     #n_rewire = trial.suggest_int('n_rewire_iterations', n_rewire_iterations_range[0], n_rewire_iterations_range[1])
-    fixed_matrix_datasets = ["cora", "citeseer"]
+    fixed_matrix_datasets = []#"cora", "citeseer"]
     
     if dataset_name.lower() in fixed_matrix_datasets:
         matrix_idx = trial_suggest_or_fixed(
@@ -669,11 +688,11 @@ def objective_iterative_rewiring(
     num_graphs = 1
     
     # Use best GCN parameters for cold-start GCN    
-    h_feats_gcn = best_gcn_params.get('h_feats', 64)
-    n_layers_gcn = best_gcn_params.get('n_layers', 1)
-    dropout_p_gcn = best_gcn_params.get('dropout_p',0.5)
-    model_lr_gcn = best_gcn_params.get('model_lr',1e-3)
-    wd_gcn = best_gcn_params.get('weight_decay',1e-5)
+    h_feats_mpnn = best_mpnn_params.get('h_feats', 64)
+    n_layers_mpnn = best_mpnn_params.get('n_layers', 1)
+    dropout_p_mpnn = best_mpnn_params.get('dropout_p',0.5)
+    model_lr_mpnn = best_mpnn_params.get('model_lr',1e-3)
+    wd_mpnn = best_mpnn_params.get('weight_decay',1e-5)
 
     # Sample parameters for selective GCN
     h_feats_sel = trial_suggest_or_fixed(
@@ -746,11 +765,12 @@ def objective_iterative_rewiring(
     stats_dict, results_list = run_iterative_bridge_experiment(
         g,
         P_k=P_k,
-        h_feats_gcn=h_feats_gcn,
-        n_layers_gcn=n_layers_gcn,
-        dropout_p_gcn=dropout_p_gcn,
-        model_lr_gcn=model_lr_gcn,
-        wd_gcn=wd_gcn,
+        model_type=model_type,
+        h_feats_mpnn=h_feats_mpnn,
+        n_layers_mpnn=n_layers_mpnn,
+        dropout_p_mpnn=dropout_p_mpnn,
+        model_lr_mpnn=model_lr_mpnn,
+        wd_mpnn=wd_mpnn,
         h_feats_selective=h_feats_sel,
         n_layers_selective=n_layers_sel,
         dropout_p_selective=dropout_p_sel,

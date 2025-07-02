@@ -138,27 +138,24 @@ def count_2cycles(permutation: List[int]) -> int:
     return transposition_count
 
 
-def sort_involutions(matrices: List[np.ndarray]) -> List[np.ndarray]:
+def sort_involutions(matrices: List[np.ndarray], Pi: np.ndarray) -> List[np.ndarray]:
     """
     Sort a list of permutation matrices by their distance from the identity.
     
-    First sorts by the number of 2-cycles (distance from identity),
-    then by lexicographic order of their one-line notation.
+    First sorts by expected homophily
     
     Args:
         matrices: List of permutation matrices
+        Pi: Class proportion diagonal matrix (not used in sorting, but included for compatibility)
         
     Returns:
         List[np.ndarray]: Sorted list of permutation matrices
     """
     def sort_key(mat):
-        p = matrix_to_permutation(mat)
-        # Primary key: number of 2-cycles
-        d = count_2cycles(p)
-        # Secondary key: the permutation itself (for tie-break)
-        return (d, p)
+        
+        return np.trace(Pi@mat)
     
-    return sorted(matrices, key=sort_key)
+    return sorted(matrices, key=sort_key, reverse=True)
 
 
 def closest_symmetric_permutation_matrix(B: np.ndarray) -> np.ndarray:
@@ -233,12 +230,13 @@ def closest_symmetric_permutation_matrix(B: np.ndarray) -> np.ndarray:
     return P
 
 
-def generate_all_symmetric_permutation_matrices(k: int) -> List[np.ndarray]:
+def generate_all_symmetric_permutation_matrices(k: int, Pi: np.ndarray) -> List[np.ndarray]:
     """
     Generate all possible k×k symmetric permutation matrices.
     
     Args:
         k: Size of the matrices
+        Pi: Class proportion diag matrix
         
     Returns:
         List[np.ndarray]: List of all symmetric permutation matrices of size k×k
@@ -264,7 +262,7 @@ def generate_all_symmetric_permutation_matrices(k: int) -> List[np.ndarray]:
         if is_symmetric(P) and not any(np.array_equal(P, existing) for existing in all_matrices):
             all_matrices.append(P)
 
-    return sort_involutions(all_matrices)
+    return sort_involutions(all_matrices, Pi)
 
 
 def optimal_B(
