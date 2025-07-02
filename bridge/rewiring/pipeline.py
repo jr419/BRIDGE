@@ -1176,28 +1176,28 @@ def run_iterative_bridge_pipeline(
         A_old = g_rewired.adj().to_dense().cpu()
         
         # Create rewired graph for this iteration
-        if not check_symmetry(g_rewired):
-            g_rewired = create_rewired_graph(
-                g=g_rewired.to(device),
-                B_opt_tensor=B_opt_tensor.to(device),
-                pred=pred.to(device),
-                Z_pred=Z_pred,
-                p_add=p_add,
-                p_remove=p_remove,
-                device=device,
-                sym_type='asymetric'
-            )
-        else:
-            g_rewired = create_rewired_graph(
-                g=g_rewired.to(device),
-                B_opt_tensor=B_opt_tensor.to(device),
-                pred=pred.to(device),
-                Z_pred=Z_pred,
-                p_add=p_add,
-                p_remove=p_remove,
-                device=device,
-                sym_type='upper'
-            )
+        # if not check_symmetry(g_rewired):
+        #     g_rewired = create_rewired_graph(
+        #         g=g_rewired.to(device),
+        #         B_opt_tensor=B_opt_tensor.to(device),
+        #         pred=pred.to(device),
+        #         Z_pred=Z_pred,
+        #         p_add=p_add,
+        #         p_remove=p_remove,
+        #         device=device,
+        #         sym_type='asymetric'
+        #     )
+        # else:
+        g_rewired = create_rewired_graph(
+            g=g_rewired.to(device),
+            B_opt_tensor=B_opt_tensor.to(device),
+            pred=pred.to(device),
+            Z_pred=Z_pred,
+            p_add=p_add,
+            p_remove=p_remove,
+            device=device,
+            sym_type='upper'
+        )
             
         # Add self-loops if requested
         if do_self_loop:

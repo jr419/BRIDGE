@@ -673,7 +673,7 @@ def objective_iterative_rewiring(
     )
     d_out = trial_suggest_or_fixed(
         trial,
-        [10, np.sqrt(g.number_of_nodes())],
+        [(10 if model_type != 'GAT' else 10), (np.sqrt(g.number_of_nodes()) if model_type != 'GAT' else 10)],  # GAT attentions scales quadratically with number of edges
         'd_out',
         param_type="float"
     )

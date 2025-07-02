@@ -41,7 +41,7 @@ standard_datasets:
 model_type: "GAT"
 
 # Optimization parameters for base GCN
-gcn_h_feats: [16, 32, 64, 128]
+gcn_h_feats: [8, 16, 32]
 gcn_n_layers: [1, 2, 3]
 gcn_dropout_range: [0.0, 0.7]
 gcn_wd_range: [1.0e-5, 0.1]
@@ -54,7 +54,7 @@ p_add_range: [1.0, 1.0]
 p_remove_range: [1.0, 1.0]
 
 # Optimization parameters for selective GCN
-h_feats_selective_options: [16, 32, 64, 128]
+h_feats_selective_options: [8, 16, 32, 64]
 n_layers_selective_options: [1, 2, 3]
 dropout_selective_range: [0.0, 0.7]
 lr_selective_range: [1.0e-5, 0.1]
