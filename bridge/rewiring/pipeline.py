@@ -1116,7 +1116,7 @@ def run_iterative_bridge_pipeline(
                     log_training=log_training,
                     metric_type=get_metric_type(dataset_name)
                 )
-            else:
+            elif iter_idx == 1:
                 # Create model using the specified model type with selective parameters
                 model = create_model(
                     model_type=model_type,
