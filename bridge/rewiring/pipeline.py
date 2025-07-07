@@ -1059,6 +1059,11 @@ def run_iterative_bridge_pipeline(
     val_acc_list = []
     test_acc_list = []
     
+    best_val_acc = 0.0
+    best_test_acc = 0.0
+    best_train_acc = 0.0
+    best_iter_idx = 0
+    
     for iter_idx in range(n_rewire):
         if simulated_acc is not None:
             # Add label noise for troubleshooting
@@ -1157,6 +1162,12 @@ def run_iterative_bridge_pipeline(
         train_acc = calculate_accuracy(pred, labels, train_mask, device)
         val_acc = calculate_accuracy(pred, labels, val_mask, device)
         test_acc = calculate_accuracy(pred, labels, test_mask, device)
+        
+        if val_acc > best_val_acc:
+            best_val_acc = val_acc
+            best_test_acc = test_acc
+            best_train_acc = train_acc
+            best_iter_idx = iter_idx
 
         # Ensure no empty classes: if any class is empty, fill it artificially
         unique_counts = pred.bincount(minlength=out_feats)
@@ -1229,6 +1240,8 @@ def run_iterative_bridge_pipeline(
                 f"Mean Homophily: {current_stats['mean_local_homophily']:.4f}, "
                 f"Edges: {current_stats['num_edges']}, "
                 f"Added: {edges_added}, Removed: {edges_removed}")
+            
+        
     
 
     # Compile results
@@ -1239,14 +1252,18 @@ def run_iterative_bridge_pipeline(
             'test_acc': test_acc_cold,
         },
         'selective': {
-            'train_acc': train_acc,
-            'val_acc': val_acc,
-            'test_acc': test_acc,
+            'train_acc': best_train_acc,
+            'val_acc': best_val_acc,
+            'test_acc': best_test_acc,
+            'best_iter': best_iter_idx + 1,  # +1 to match human
         },
         'original_stats': original_stats,
-        'rewired_stats': current_stats,
+        'rewired_stats': rewiring_history[best_iter_idx],  # Use stats from the best iteration
         'rewiring_history': rewiring_history,
-        'model_type': model_type  # Add model type to results
+        'model_type': model_type,  # Add model type to results
+        'train_acc_list': train_acc_list,
+        'val_acc_list': val_acc_list,
+        'test_acc_list': test_acc_list,
     }
     return results
 
@@ -1410,6 +1427,7 @@ def run_iterative_bridge_experiment(
         # Store results and statistics
         test_acc_list.append(results['selective']['test_acc'])
         val_acc_list.append(results['selective']['val_acc'])
+        
         results_list.append(results)
         
         edges_added_list.append(results['rewired_stats']['edges_added'])
