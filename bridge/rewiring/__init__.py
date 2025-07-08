@@ -8,6 +8,7 @@ the performance of graph neural networks while preserving important information.
 from .operations import create_rewired_graph
 from .pipeline import run_bridge_pipeline, run_bridge_experiment, run_iterative_bridge_pipeline, run_iterative_bridge_experiment, create_model
 from .sdrf import sdrf_rewire
+from .digl import compute_ppr_matrix, compute_heat_kernel, digl_rewired
 __all__ = [
     'create_rewired_graph',
     'run_bridge_pipeline',
@@ -15,5 +16,8 @@ __all__ = [
     'run_iterative_bridge_pipeline',
     'run_iterative_bridge_experiment',
     'create_model',
-    'sdrf_rewire'
+    'sdrf_rewire', 
+    'compute_ppr_matrix',
+    'compute_heat_kernel',
+    'digl_rewired'
 ]

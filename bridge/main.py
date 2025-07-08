@@ -123,10 +123,21 @@ def parse_args():
     parser.add_argument('--continue_trials', type=int, default=300,
                         help='Number of additional trials to run when continuing a study')
     
-    parser.add_argument('--rewiring_method', type=str, choices=['bridge','sdrf'], default='bridge')
+    parser.add_argument('--rewiring_method', type=str, choices=['bridge','sdrf','digl'], default='bridge')
     parser.add_argument('--sdrf_tau_range', nargs=2, type=float, default=[1e-2, 5e2])
     parser.add_argument('--sdrf_iterations_range', nargs=2, type=int, default=[1, 500])
     parser.add_argument('--sdrf_c_plus_range', nargs=2, type=float, default= [0.0, 50.0])
+    
+    # Add DIGL parameters
+    parser.add_argument('--digl_diffusion_type', type=str, choices=['ppr', 'heat'], default='ppr',
+                        help='Type of diffusion for DIGL: ppr (PageRank) or heat (heat kernel)')
+    parser.add_argument('--digl_alpha_range', nargs=2, type=float, default=[0.05, 0.25],
+                        help='PPR teleport probability range for DIGL')
+    parser.add_argument('--digl_t_range', nargs=2, type=float, default=[1.0, 10.0],
+                        help='Heat kernel time parameter range for DIGL')
+    parser.add_argument('--digl_epsilon_range', nargs=2, type=float, default=[0.001, 0.1],
+                        help='Threshold range for edge addition/removal in DIGL')
+
 
 
     return parser.parse_args()
@@ -434,6 +445,10 @@ def run_rewiring_experiment(args):
                             sdrf_tau_range=args.sdrf_tau_range,
                             sdrf_n_iterations_range=args.sdrf_iterations_range,
                             sdrf_c_plus_range=args.sdrf_c_plus_range,
+                            digl_diffusion_type=args.digl_diffusion_type,
+                            digl_alpha_range=args.digl_alpha_range,
+                            digl_t_range=args.digl_t_range,
+                            digl_epsilon_range=args.digl_epsilon_range,
                             simulated_acc=args.simulated_acc
                         )
                     else:
@@ -555,6 +570,19 @@ def run_rewiring_experiment(args):
                     sdrf_iterations = None
                     sdrf_c_plus = None
                 
+                if  args.rewiring_method == 'digl':
+                    # Extract DIGL parameters
+                    digl_alpha = best_rewiring_params.get('digl_alpha', best_rewiring_attributes.get('digl_alpha'))
+                    digl_t = best_rewiring_params.get('digl_t', best_rewiring_attributes.get('digl_t'))
+                    digl_epsilon = best_rewiring_params.get('digl_epsilon', best_rewiring_attributes.get('digl_epsilon'))
+                    digl_diffusion_type = best_rewiring_params.get('digl_diffusion_type', best_rewiring_attributes.get('digl_diffusion_type', 'ppr'))
+                else:
+                    digl_alpha = None
+                    digl_t = None
+                    digl_epsilon = None
+                    digl_diffusion_type = None
+
+                
                 # Run final experiment with best parameters
 
                 # baseline MPNN
@@ -619,6 +647,10 @@ def run_rewiring_experiment(args):
                         tau=sdrf_tau,
                         sdrf_iterations=sdrf_iterations,
                         c_plus=sdrf_c_plus,
+                        digl_alpha=digl_alpha,
+                        digl_t=digl_t,
+                        digl_epsilon=digl_epsilon,
+                        digl_diffusion_type=digl_diffusion_type,
                         simulated_acc=args.simulated_acc
                     )
                 else:

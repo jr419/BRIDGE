@@ -577,6 +577,10 @@ def objective_iterative_rewiring(
     sdrf_tau_range: list = [0.01, 300],
     sdrf_n_iterations_range: list = [1, 300],
     sdrf_c_plus_range: list = [0, 50],
+    digl_diffusion_type='ppr',
+    digl_alpha_range=[0.05, 0.25],
+    digl_t_range=[1.0, 10.0],
+    digl_epsilon_range=[0.001, 0.1],
     simulated_acc: Optional[float] = None
 ) -> float:
     """
@@ -780,6 +784,26 @@ def objective_iterative_rewiring(
         'sdrf_c_plus',
         param_type="float"
     )
+    
+    digl_alpha = trial_suggest_or_fixed(
+        trial,
+        digl_alpha_range,
+        'digl_alpha',
+        param_type="float"
+    )
+    digl_t = trial_suggest_or_fixed(
+        trial,
+        digl_t_range,
+        'digl_t',
+        param_type="float"
+    )
+    digl_epsilon = trial_suggest_or_fixed(
+        trial,
+        digl_epsilon_range,
+        'digl_epsilon',
+        param_type="float"
+    )
+    
     #trial.suggest_categorical('sgc_K', sgc_K_options) 
     #trial.suggest_float('sgc_lr', sgc_lr_range[0], sgc_lr_range[1], log=True)
     #trial.suggest_float('sgc_wd', sgc_wd_range[0], sgc_wd_range[1], log=True)
@@ -822,7 +846,11 @@ def objective_iterative_rewiring(
         tau=tau,
         sdrf_iterations=sdrf_iterations,
         c_plus=c_plus,
-        simulated_acc=simulated_acc
+        digl_diffusion_type=digl_diffusion_type,
+        digl_alpha=digl_alpha,
+        digl_t=digl_t,
+        digl_epsilon=digl_epsilon,
+        simulated_acc=simulated_acc,
     )
 
     # Store the permutation matrix used
@@ -858,5 +886,10 @@ def objective_iterative_rewiring(
     trial.set_user_attr('sdrf_tau', tau)
     trial.set_user_attr('sdrf_iterations', sdrf_iterations)
     trial.set_user_attr('sdrf_c_plus', c_plus)
+    
+    trial.set_user_attr('digl_diffusion_type', digl_diffusion_type)
+    trial.set_user_attr('digl_alpha', digl_alpha)
+    trial.set_user_attr('digl_t', digl_t)
+    trial.set_user_attr('digl_epsilon', digl_epsilon)
     
     return -stats_dict['val_acc_mean']  # Minimize negative validation accuracy
