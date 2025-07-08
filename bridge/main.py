@@ -122,6 +122,12 @@ def parse_args():
                         help='Name of the study to load from the database')
     parser.add_argument('--continue_trials', type=int, default=300,
                         help='Number of additional trials to run when continuing a study')
+    
+    parser.add_argument('--rewiring_method', type=str, choices=['bridge','sdrf'], default='bridge')
+    parser.add_argument('--sdrf_tau_range', nargs=2, type=float, default=[1e-2, 5e2])
+    parser.add_argument('--sdrf_iterations_range', nargs=2, type=int, default=[1, 500])
+    parser.add_argument('--sdrf_c_plus_range', nargs=2, type=float, default= [0.0, 50.0])
+
 
     return parser.parse_args()
 
@@ -424,6 +430,10 @@ def run_rewiring_experiment(args):
                             sgc_K_options=args.sgc_K_options,
                             sgc_wd_range=args.sgc_wd_range,
                             sgc_lr_range=args.sgc_lr_range,
+                            rewiring_method=args.rewiring_method,
+                            sdrf_tau_range=args.sdrf_tau_range,
+                            sdrf_n_iterations_range=args.sdrf_iterations_range,
+                            sdrf_c_plus_range=args.sdrf_c_plus_range,
                             simulated_acc=args.simulated_acc
                         )
                     else:
@@ -535,6 +545,15 @@ def run_rewiring_experiment(args):
                     sgc_K = best_rewiring_params.get('sgc_K', best_rewiring_attributes.get('sgc_K'))
                     sgc_wd = best_rewiring_params.get('sgc_wd', best_rewiring_attributes.get('sgc_wd'))
                     sgc_lr = best_rewiring_params.get('sgc_lr', best_rewiring_attributes.get('sgc_lr'))
+                    
+                if args.rewiring_method == 'sdrf':
+                    sdrf_tau = best_rewiring_params.get('sdrf_tau', best_rewiring_attributes.get('sdrf_tau'))
+                    sdrf_iterations = best_rewiring_params.get('sdrf_iterations', best_rewiring_attributes.get('sdrf_iterations'))
+                    sdrf_c_plus = best_rewiring_params.get('sdrf_c_plus', best_rewiring_attributes.get('sdrf_c_plus'))
+                else:
+                    sdrf_tau = None
+                    sdrf_iterations = None
+                    sdrf_c_plus = None
                 
                 # Run final experiment with best parameters
 
@@ -596,6 +615,10 @@ def run_rewiring_experiment(args):
                         sgc_K=sgc_K,
                         sgc_wd=sgc_wd,
                         sgc_lr=sgc_lr,
+                        rewiring_method=args.rewiring_method,
+                        tau=sdrf_tau,
+                        sdrf_iterations=sdrf_iterations,
+                        c_plus=sdrf_c_plus,
                         simulated_acc=args.simulated_acc
                     )
                 else:

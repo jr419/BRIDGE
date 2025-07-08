@@ -573,6 +573,10 @@ def objective_iterative_rewiring(
     sgc_K_options: List[int] = None,
     sgc_lr_range: List[float] = None,
     sgc_wd_range: List[float] = None,
+    rewiring_method: str = "bridge",
+    sdrf_tau_range: list = [0.01, 300],
+    sdrf_n_iterations_range: list = [1, 300],
+    sdrf_c_plus_range: list = [0, 50],
     simulated_acc: Optional[float] = None
 ) -> float:
     """
@@ -757,6 +761,25 @@ def objective_iterative_rewiring(
         param_type="float",
         log_scale=True
     )
+    
+    tau = trial_suggest_or_fixed(
+        trial,
+        sdrf_tau_range,
+        'sdrf_tau',
+        param_type="float"
+    )
+    sdrf_iterations = trial_suggest_or_fixed(
+        trial,
+        sdrf_n_iterations_range,
+        'sdrf_iterations',
+        param_type="int"
+    )
+    c_plus = trial_suggest_or_fixed(
+        trial,
+        sdrf_c_plus_range,
+        'sdrf_c_plus',
+        param_type="float"
+    )
     #trial.suggest_categorical('sgc_K', sgc_K_options) 
     #trial.suggest_float('sgc_lr', sgc_lr_range[0], sgc_lr_range[1], log=True)
     #trial.suggest_float('sgc_wd', sgc_wd_range[0], sgc_wd_range[1], log=True)
@@ -795,6 +818,10 @@ def objective_iterative_rewiring(
         sgc_K=sgc_K,
         sgc_lr=sgc_lr,
         sgc_wd=sgc_wd,
+        rewiring_method=rewiring_method,
+        tau=tau,
+        sdrf_iterations=sdrf_iterations,
+        c_plus=c_plus,
         simulated_acc=simulated_acc
     )
 
@@ -827,5 +854,9 @@ def objective_iterative_rewiring(
     trial.set_user_attr('sgc_K', sgc_K)
     trial.set_user_attr('sgc_lr', sgc_lr)
     trial.set_user_attr('sgc_wd', sgc_wd)
+    
+    trial.set_user_attr('sdrf_tau', tau)
+    trial.set_user_attr('sdrf_iterations', sdrf_iterations)
+    trial.set_user_attr('sdrf_c_plus', c_plus)
     
     return -stats_dict['val_acc_mean']  # Minimize negative validation accuracy

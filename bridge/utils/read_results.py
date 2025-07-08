@@ -41,8 +41,8 @@
 #         data = json.load(f)
 
 #     # For example, from your sample JSON, we can extract:
-#     base_acc = 100*data["base_gcn"]["test_accuracy"]  # test_accuracy
-#     base_acc_ci = data["base_gcn"]["test_accuracy_ci"]
+#     base_acc = 100*data["base_mpnn"]["test_accuracy"]  # test_accuracy
+#     base_acc_ci = data["base_mpnn"]["test_accuracy_ci"]
 #     # For "rewiring", if there's a mean and confidence interval, we can either
 #     # use the mean or store the full ± CI. We'll store the mean plus the ± from CI.
 #     rewired_mean = 100*data["rewiring"]["test_accuracy_mean"]
@@ -368,11 +368,18 @@ def parse_single_dataset_results(json_path):
         data = json.load(f)
 
     # means (as %)
-    base_mean    = 100 * data["base_gcn"]["test_accuracy"]
+    if 'base_mpnn' in data:
+        base_key_name = "base_mpnn"
+    elif 'base_gcn' in data:
+        base_key_name = "base_gcn"
+    else:
+        print(data.keys())
+        raise ValueError("JSON does not contain 'base_mpnn' or 'base_gcn' key.")
+    base_mean    = 100 * data[base_key_name]["test_accuracy"]
     rewired_mean = 100 * data["rewiring"]["test_accuracy_mean"]
 
     # CI endpoints
-    base_low, base_high       = data["base_gcn"]["test_accuracy_ci"]
+    base_low, base_high       = data[base_key_name]["test_accuracy_ci"]
     rewired_low, rewired_high = data["rewiring"]["test_accuracy_ci"]
 
     # half‐ranges of the 95% CI
@@ -541,12 +548,8 @@ Model & {header_columns} \\\\
 def main():
     # Define model folders - adjust these paths to your actual data locations
     model_folders = [
-        #('High-Pass GCN', 'results/rewiring/no_self_loop_yes_hp_fixed_n_layers_2025-03-20-09-32-06'),
-        # ('Single Rewiring', 'results/rewiring/large_run_no_hp_2025-05-07-14-01-06'),
-        # ('Short Rewiring', 'results/rewiring/incremental_iterative_selective_rewiring_full_2025-05-02-13-04-15'),
-        # ('Iterative Rewiring', 'results/rewiring/long_rewiring_download'),
-        # ('Full Block Rewiring', 'results/rewiring/full_block_rewiring_2025-05-12-14-11-54')
-        ('GCN','results/rewiring/final_synthetic_data_collection')
+        ('BRIDGE','results/rewiring/final_synthetic_data_collection'),
+        ('SDRF', 'results/rewiring/sdrf_rewiring_final'),
     ]
     
     # Parse results for each folder

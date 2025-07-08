@@ -1,0 +1,10 @@
+{
+  "num_runs": 100,
+  "mean_train_acc": 0.9961428654193878,
+  "std_train_acc": 0.003577908508067856,
+  "mean_val_acc": 0.7806200385093689,
+  "std_val_acc": 0.008247170685903539,
+  "mean_test_acc": 0.797050034403801,
+  "std_test_acc": 0.008218448999698962,
+  "mean_epochs": 198.51,
+  "node_acc_mean": 

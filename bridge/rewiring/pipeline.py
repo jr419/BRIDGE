@@ -22,6 +22,7 @@ from ..utils import (
     compute_confidence_interval, estimate_iid_variances
 )
 from .operations import create_rewired_graph
+from .sdrf import sdrf_rewire
 
 def run_bridge_pipeline(
     g: dgl.DGLGraph,
@@ -938,6 +939,10 @@ def run_iterative_bridge_pipeline(
     sgc_K: int = 2,
     sgc_lr: float = 1e-2,
     sgc_wd: float = 1e-4,
+    rewiring_method: str = "bridge",
+    tau: float = 0.1,
+    sdrf_iterations: int = 1,
+    c_plus: float = 0.0,
     simulated_acc: Optional[float] = None
 ) -> Dict[str, Any]:
     """
@@ -986,6 +991,10 @@ def run_iterative_bridge_pipeline(
         sgc_K: Number of propagation steps for SGC
         sgc_lr: Learning rate specifically for the SGC model in first iteration
         sgc_wd: Weight decay specifically for the SGC model in first iteration
+        rewiring_method: Method to use for rewiring ('sdrf' or 'bridge')
+        sdrf_tau_range: Range of tau values for SDRF rewiring
+        sdrf_n_iterations_range: Range of n_iterations for SDRF rewiring
+        sdrf_c_plus_range: Range of c_plus values for SDRF rewiring
         simulated_acc: Optional float between 0 and 1 representing the accuracy of simulated predictions. 
                                    If provided, skips model training and uses noisy ground truth labels instead.
                                    E.g., 0.8 means 80% of predictions are correct, 20% are random noise.
@@ -1045,6 +1054,13 @@ def run_iterative_bridge_pipeline(
     # Initialize graph for iterative rewiring
     g_rewired = g.clone()
     
+    if rewiring_method == 'sdrf':
+        g_rewired = sdrf_rewire(
+            g_in=g_rewired,
+            tau=tau,
+            n_iterations=sdrf_iterations,
+            c_plus=c_plus)
+    
     # Initialize in_feats and out_feats
     in_feats = feat.shape[1]
     out_feats = int(labels.max().item()) + 1
@@ -1064,7 +1080,7 @@ def run_iterative_bridge_pipeline(
     best_train_acc = 0.0
     best_iter_idx = 0
     
-    for iter_idx in range(n_rewire):
+    for iter_idx in range(n_rewire):    
         if simulated_acc is not None:
             # Add label noise for troubleshooting
             # simulated_acc represents the accuracy (1 - noise_fraction*(1-1/k))
@@ -1092,9 +1108,10 @@ def run_iterative_bridge_pipeline(
             if log_training:
                 print(f"Added {noise_mask.sum().item()} noisy labels in iteration {iter_idx+1} "
                       f"(accuracy: {simulated_acc:.2f})")
+                
         
         else:
-            if iter_idx == 0:
+            if iter_idx == 0 and rewiring_method == 'bridge':
                 # Create model using the specified model type
                 model = create_model(
                     model_type=model_type,
@@ -1121,7 +1138,8 @@ def run_iterative_bridge_pipeline(
                     log_training=log_training,
                     metric_type=get_metric_type(dataset_name)
                 )
-            elif iter_idx == 1:
+                
+            elif iter_idx == 1 or rewiring_method == 'sdrf':
                 # Create model using the specified model type with selective parameters
                 model = create_model(
                     model_type=model_type,
@@ -1199,16 +1217,20 @@ def run_iterative_bridge_pipeline(
         #         sym_type='asymetric'
         #     )
         # else:
-        g_rewired = create_rewired_graph(
-            g=g_rewired.to(device),
-            B_opt_tensor=B_opt_tensor.to(device),
-            pred=pred.to(device),
-            Z_pred=Z_pred,
-            p_add=p_add,
-            p_remove=p_remove,
-            device=device,
-            sym_type='upper'
-        )
+        if rewiring_method == 'sdrf':
+            # For SDRF, we already rewired the graph at the start
+            g_rewired = g_rewired.to(device)
+        else:
+            g_rewired = create_rewired_graph(
+                g=g_rewired.to(device),
+                B_opt_tensor=B_opt_tensor.to(device),
+                pred=pred.to(device),
+                Z_pred=Z_pred,
+                p_add=p_add,
+                p_remove=p_remove,
+                device=device,
+                sym_type='upper'
+            )
             
         # Add self-loops if requested
         if do_self_loop:
@@ -1241,6 +1263,12 @@ def run_iterative_bridge_pipeline(
                 f"Edges: {current_stats['num_edges']}, "
                 f"Added: {edges_added}, Removed: {edges_removed}")
             
+        if rewiring_method == 'sdrf':
+            train_acc_cold = train_acc
+            val_acc_cold = val_acc
+            test_acc_cold = test_acc
+            break # SDRF rewiring is done only once at the start
+            
         
     
 
@@ -1255,7 +1283,7 @@ def run_iterative_bridge_pipeline(
             'train_acc': best_train_acc,
             'val_acc': best_val_acc,
             'test_acc': best_test_acc,
-            'best_iter': best_iter_idx + 1,  # +1 to match human
+            'best_iter': best_iter_idx + 1,
         },
         'original_stats': original_stats,
         'rewired_stats': rewiring_history[best_iter_idx],  # Use stats from the best iteration
@@ -1301,6 +1329,10 @@ def run_iterative_bridge_experiment(
     sgc_K: int = 2,
     sgc_lr: float = 1e-2,
     sgc_wd: float = 1e-4,
+    rewiring_method: str = "bridge",
+    tau: float = 0.1,
+    sdrf_iterations: int = 1,
+    c_plus: float = 0.0,
     simulated_acc: Optional[float] = None
     
 ) -> Tuple[Dict[str, Any], List[Dict[str, Any]]]:
@@ -1343,6 +1375,10 @@ def run_iterative_bridge_experiment(
         sgc_K: Number of propagation steps for SGC
         sgc_lr: Learning rate specifically for the SGC model in first iteration
         sgc_wd: Weight decay specifically for the SGC model in first iteration
+        rewiring_method: Method to use for rewiring ('sdrf' or 'random')
+        sdrf_tau_range: Range of tau values for SDRF rewiring
+        sdrf_n_iterations_range: Range of n_iterations for SDRF rewiring
+        sdrf_c_plus_range: Range of c_plus values for SDRF rewiring
         simulated_acc: Optional float between 0 and 1 representing the accuracy of simulated predictions. 
                                    If provided, skips model training and uses noisy ground truth labels instead.
                                    E.g., 0.8 means 80% of predictions are correct, 20% are random noise.
@@ -1421,6 +1457,10 @@ def run_iterative_bridge_experiment(
             sgc_K=sgc_K,
             sgc_lr=sgc_lr,
             sgc_wd=sgc_wd,
+            rewiring_method=rewiring_method,
+            tau=tau,
+            sdrf_iterations=sdrf_iterations,
+            c_plus=c_plus,
             simulated_acc=simulated_acc
         )
         
