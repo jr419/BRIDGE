@@ -343,8 +343,8 @@ from pathlib import Path
 # ------------------------------------------------------------------------------
 # Configuration
 # ------------------------------------------------------------------------------
-MAIN_DATASETS = ["cora", "citeseer", "pubmed",'actor', 'squirrel', 'chameleon']
-OTHER_DATASETS = ['wisconsin', 'cornell', 'texas']
+MAIN_DATASETS = ["cora", "citeseer", "pubmed"]
+OTHER_DATASETS = ['actor','squirrel','chameleon','wisconsin', 'cornell', 'texas']
 SYNTHETIC_DATASETS = [
     'synthetic_graph_dataset_h=0.35_d=10.00',
     'synthetic_graph_dataset_h=0.40_d=10.00',
@@ -548,8 +548,10 @@ Model & {header_columns} \\\\
 def main():
     # Define model folders - adjust these paths to your actual data locations
     model_folders = [
-        ('BRIDGE','results/rewiring/final_synthetic_data_collection'),
-        ('SDRF', 'results/rewiring/sdrf_rewiring_final'),
+        # ('BRIDGE','results/rewiring/final_synthetic_data_collection'),
+        # ('SDRF', 'results/rewiring/sdrf_rewiring_final'),
+        # ('DIGL', 'results/rewiring/final_synthetic_digl')
+        ('BRIDGE', 'results/rewiring/final_gcn_real_world'),
     ]
     
     # Parse results for each folder
@@ -563,7 +565,7 @@ def main():
         MAIN_DATASETS,
         "Model Performance Before and After Rewiring",
         "tab:accuracies",
-        ["Cora", "Citeseer", "Pubmed", "Actor", "Squirrel", "Chameleon"]
+        ["Cora", "Citeseer", "Pubmed"]#, "Actor", "Squirrel", "Chameleon"]
     )
     
     other_table = build_table(
