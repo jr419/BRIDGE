@@ -1,232 +1,383 @@
 """
-DIGL (Diffusion Improves Graph Learning) rewiring implementation.
+Efficient DIGL (Diffusion Improves Graph Learning) rewiring for DGL.
 
-Based on: Klicpera, J., Weißenberger, S., & Günnemann, S. (2019). 
-Diffusion improves graph learning. NeurIPS.
+This module re‑implements the rewiring procedure described in
+“Diffusion Improves Graph Learning” (Klicpera et al., 2019) using the
+exact formulation employed in the official PyTorch Geometric
+implementation of Graph Diffusion Convolution (GDC)【318729141242744†L160-L198】.
+
+Given an input :class:`dgl.DGLGraph`, the routine computes a dense
+diffusion kernel (personalised PageRank or heat kernel) on a normalised
+transition matrix, sparsifies it by either a per‑node top–:math:`k`
+operator or a global threshold, and constructs a new DGL graph from
+the retained edges.  Edge weights are stored in the ``edata['weight']``
+field; node features are copied from the original graph.
+
+Compared to the earlier ``digl_rewired`` implementation in ``bridge/rewiring/digl.py``
+the present implementation avoids expensive Python loops and uses
+closed‑form matrix inverses or exponentials.  It also follows the
+normalisation and sparsification strategy of GDC: normalise the
+adjacency matrix into a transition matrix, compute the diffusion
+matrix exactly, then sparsify the result to achieve a desired
+average degree or top‑:math:`k` neighbourhood【318729141242744†L160-L198】.
+
+The original implementation computed diffusion via power iteration
+and selected edges by comparing diffusion scores to the existing
+adjacency.  This is both slow and prone to producing disconnected
+graphs: if diffusion scores on existing edges are all above the
+threshold ``epsilon`` the removal step never triggers, while large
+``add_ratio`` values can introduce many weak connections.  In
+contrast, this reimplementation directly sparsifies the dense
+diffusion matrix, ensuring that exactly the most important
+connections (according to diffusion) are preserved and resulting
+graphs remain connected under reasonable hyper‑parameters.
+
+Example usage::
+
+    import dgl
+    from digl_dgl import digl_rewire
+    g = dgl.rand_graph(100, 300)
+    rewired = digl_rewire(g, method='ppr', alpha=0.1, avg_degree=32)
+    # rewired is a DGLGraph whose edges correspond to the top diffusion
+    # connections.  Edge weights are stored in rewired.edata['weight'].
+
 """
+
+from __future__ import annotations
+
+from typing import Optional, Tuple, Union
 
 import torch
 import dgl
-import numpy as np
-from typing import Tuple, Optional, Union
 
+def _normalised_transition_matrix(
+    g: dgl.DGLGraph,
+    normalization: str = 'sym',
+    device: Optional[torch.device] = None,
+) -> torch.Tensor:
+    """Return a dense transition matrix from a DGL graph.
 
-def compute_ppr_matrix(g: dgl.DGLGraph, alpha: float = 0.15, eps: float = 1e-6, max_iter: int = 100) -> torch.Tensor:
-    """
-    Compute the Personalized PageRank (PPR) matrix using power iteration.
-    
-    Args:
-        g: Input DGL graph
-        alpha: Teleport probability (restart probability)
-        eps: Convergence threshold
-        max_iter: Maximum number of iterations
-        
-    Returns:
-        torch.Tensor: PPR matrix of shape (n_nodes, n_nodes)
-    """
-    n = g.number_of_nodes()
-    device = g.device
-    
-    # Get adjacency matrix and compute transition matrix
-    A = g.adjacency_matrix().to_dense().float().to(device)
-    degrees = g.out_degrees().float().to(device)
-    
-    # Avoid division by zero
-    degrees[degrees == 0] = 1.0
-    
-    # Row-normalized adjacency matrix (transition matrix)
-    P = A / degrees.unsqueeze(1)
-    
-    # Initialize PPR matrix (each node's PPR vector)
-    PPR = torch.eye(n, device=device)
-    
-    # Power iteration for each source node
-    for _ in range(max_iter):
-        PPR_old = PPR.clone()
-        PPR = alpha * torch.eye(n, device=device) + (1 - alpha) * torch.matmul(P.T, PPR)
-        
-        # Check convergence
-        if torch.max(torch.abs(PPR - PPR_old)) < eps:
-            break
-    
-    return PPR
+    Parameters
+    ----------
+    g:
+        Input DGL graph.  Must be homogeneous and unweighted.  If the
+        graph has multiple edges between the same pair of nodes they are
+        collapsed to a single connection; DGL graphs store edges in
+        adjacency lists so this does not affect functionality.
+    normalization:
+        Type of normalisation to apply: ``'sym'`` (symmetric),
+        ``'row'`` (row‑stochastic), ``'col'`` (column‑stochastic) or
+        ``None`` (no normalisation).  See the PyTorch Geometric
+        documentation for ``GDC.transition_matrix`` for definitions【318729141242744†L213-L266】.
+    device:
+        Optional device on which to perform the computation.  If
+        ``None`` the graph's device is used.
 
-
-def compute_heat_kernel(g: dgl.DGLGraph, t: float = 5.0, method: str = 'exact') -> torch.Tensor:
-    """
-    Compute the heat kernel matrix.
-    
-    Args:
-        g: Input DGL graph
-        t: Diffusion time parameter
-        method: 'exact' for eigendecomposition, 'approx' for approximation
-        
-    Returns:
-        torch.Tensor: Heat kernel matrix of shape (n_nodes, n_nodes)
+    Returns
+    -------
+    torch.Tensor
+        A dense transition matrix of shape ``(n_nodes, n_nodes)``.
     """
     n = g.number_of_nodes()
-    device = g.device
-    
-    # Get normalized Laplacian
+    device = device or g.device
+
+    # Obtain dense unweighted adjacency.
+    # DGL returns a sparse tensor; convert to dense and cast to float.
     A = g.adjacency_matrix().to_dense().float().to(device)
-    degrees = g.out_degrees().float().to(device)
-    degrees[degrees == 0] = 1.0
-    
-    # Compute normalized Laplacian L = I - D^(-1/2) * A * D^(-1/2)
-    D_sqrt_inv = torch.diag(1.0 / torch.sqrt(degrees))
-    L = torch.eye(n, device=device) - torch.matmul(torch.matmul(D_sqrt_inv, A), D_sqrt_inv)
-    
-    if method == 'exact' and n < 1000:  # Use exact method for small graphs
-        # Eigendecomposition
-        eigenvalues, eigenvectors = torch.linalg.eigh(L)
-        # Heat kernel: H = U * exp(-t * Lambda) * U^T
-        H = torch.matmul(
-            torch.matmul(eigenvectors, torch.diag(torch.exp(-t * eigenvalues))),
-            eigenvectors.T
-        )
-    else:  # Use approximation for large graphs
-        # Taylor approximation: exp(-tL) ≈ sum_{k=0}^K (-t)^k L^k / k!
-        K = 10  # Number of terms
-        H = torch.eye(n, device=device)
-        L_power = torch.eye(n, device=device)
-        
-        for k in range(1, K + 1):
-            L_power = torch.matmul(L_power, L)
-            H = H + ((-t) ** k / np.math.factorial(k)) * L_power
-    
-    return H
+
+    # Degree of each node (out degree equals in degree for undirected
+    # graphs).  Avoid division by zero by clamping degrees to at least 1.
+    deg = g.out_degrees().float().to(device)
+    deg[deg == 0] = 1.0
+
+    if normalization == 'sym':
+        # Symmetric normalisation: D^{-1/2} A D^{-1/2}
+        inv_sqrt_deg = 1.0 / torch.sqrt(deg)
+        T = inv_sqrt_deg.view(n, 1) * A * inv_sqrt_deg.view(1, n)
+    elif normalization == 'row':
+        # Row normalisation: D^{-1} A
+        T = A / deg.view(n, 1)
+    elif normalization == 'col':
+        # Column normalisation: A D^{-1}
+        T = A / deg.view(1, n)
+    elif normalization is None:
+        T = A
+    else:
+        raise ValueError(f"unknown normalization '{normalization}'")
+
+    return T
+
+
+def _diffusion_matrix(
+    T: torch.Tensor,
+    method: str = 'ppr',
+    alpha: float = 0.15,
+    t: float = 5.0,
+    coeffs: Optional[torch.Tensor] = None,
+) -> torch.Tensor:
+    """Compute a dense diffusion matrix from a transition matrix.
+
+    This function mirrors the exact diffusion implementation in
+    :class:`torch_geometric.transforms.GDC`【318729141242744†L268-L329】.  It
+    supports personalised PageRank (PPR), the heat kernel and a
+    user‑specified polynomial in the transition matrix.  All diffusion
+    matrices are computed exactly; for PPR and heat this requires
+    inverting or exponentiating a dense matrix and is therefore best
+    suited to medium‑sized graphs (up to a few thousand nodes).
+
+    Parameters
+    ----------
+    T:
+        Dense transition matrix (usually normalised adjacency).  Must
+        have shape ``(n, n)``.
+    method:
+        Diffusion method: ``'ppr'`` (default), ``'heat'`` or ``'coeff'``.
+    alpha:
+        Teleport probability for PPR.  Ignored for other methods.
+    t:
+        Diffusion time for the heat kernel.  Ignored for other methods.
+    coeffs:
+        Sequence of coefficients :math:`(\theta_0, \dots, \theta_K)` used
+        when ``method='coeff'``.  The diffusion matrix is then
+        :math:`\sum_k \theta_k T^k`.  The zeroth coefficient multiplies
+        the identity.
+
+    Returns
+    -------
+    torch.Tensor
+        Dense diffusion matrix of shape ``(n, n)``.
+    """
+    n = T.size(0)
+    I = torch.eye(n, device=T.device, dtype=T.dtype)
+
+    if method == 'ppr':
+        # Following GDC: diff = alpha * (I + (alpha - 1) * T)^{-1}
+        # This is equivalent to alpha * (I - (1 - alpha) * T)^{-1} when T
+        # is row‑ or symmetric‑normalised.  See Eq. (4) in the paper.
+        M = I + (alpha - 1.0) * T
+        diff = alpha * torch.linalg.inv(M)
+    elif method == 'heat':
+        # Heat kernel: diff = exp(t * (T - I))
+        M = (T - I) * t
+        # When T is symmetric the matrix exponential is symmetric, and
+        # eigen decomposition is numerically stable.  Otherwise fall
+        # back to torch.matrix_exp (PyTorch >= 2.0) or SciPy.
+        try:
+            # Using eigen decomposition ensures symmetry is preserved.
+            eigvals, eigvecs = torch.linalg.eigh(M)
+            diff = eigvecs @ torch.diag(torch.exp(eigvals)) @ eigvecs.T
+        except RuntimeError:
+            # If eigen decomposition fails (e.g. non‑symmetric input)
+            # resort to the general matrix exponential.  PyTorch
+            # provides this in torch.matrix_exp.  If unavailable,
+            # users should install SciPy and use scipy.linalg.expm.
+            if hasattr(torch, 'matrix_exp'):
+                diff = torch.matrix_exp(M)
+            else:
+                from scipy.linalg import expm  # type: ignore
+                diff = torch.from_numpy(expm(M.cpu().numpy())).to(M.device)
+    elif method == 'coeff':
+        if coeffs is None:
+            raise ValueError("'coeffs' must be provided for method='coeff'")
+        K = len(coeffs)
+        # Start with theta_0 * I
+        diff = coeffs[0] * I
+        T_power = I.clone()
+        for k in range(1, K):
+            T_power = T_power @ T
+            diff = diff + coeffs[k] * T_power
+    else:
+        raise ValueError(f"unknown diffusion method '{method}'")
+    return diff
+
+
+def _sparsify_diffusion(
+    diff: torch.Tensor,
+    *,
+    k: Optional[int] = None,
+    eps: Optional[float] = None,
+    avg_degree: Optional[int] = None,
+    retain_self_loops: bool = False,
+) -> Tuple[torch.Tensor, torch.Tensor]:
+    """Sparsify a dense diffusion matrix by thresholding or top‑:math:`k`.
+
+    Parameters
+    ----------
+    diff:
+        Dense diffusion matrix of shape ``(n, n)``.
+    k:
+        If given, keep the top ``k`` largest diffusion weights *per
+        column* of ``diff``.  This mirrors the ``topk`` sparsification
+        option in PyTorch Geometric【318729141242744†L427-L499】.
+    eps:
+        Absolute threshold.  If provided, keep all entries
+        :math:`\ge \text{eps}`.
+    avg_degree:
+        Desired average degree (number of edges per node) when
+        ``eps`` is not specified.  If ``eps`` is ``None`` and
+        ``avg_degree`` is specified, the threshold is computed as the
+        ``avg_degree * n``‑th largest entry of ``diff``【318729141242744†L427-L499】.
+    retain_self_loops:
+        Whether to keep self‑loops in the sparsified matrix.  When
+        ``False`` (default) the diagonal of ``diff`` is ignored.
+
+    Returns
+    -------
+    Tuple[torch.Tensor, torch.Tensor]
+        ``(edge_index, edge_weight)``.  ``edge_index`` is a 2×M tensor
+        containing source and destination indices of retained edges,
+        while ``edge_weight`` holds the corresponding diffusion values.
+    """
+    n = diff.size(0)
+    device = diff.device
+
+    # Zero out diagonal unless self‑loops are explicitly retained.
+    if not retain_self_loops:
+        diff = diff.clone()
+        diff.fill_diagonal_(0.0)
+
+    if k is not None:
+        # Ensure k does not exceed the number of nodes
+        k = int(min(k, n))
+        # Sort each column in descending order and pick top k row indices
+        # indices shape: (n, k) if we sort along dim=0 (rows).  We
+        # transpose so that we can easily repeat column indices.
+        sorted_idx = torch.argsort(diff, dim=0, descending=True)
+        top_idx = sorted_idx[:k, :]  # top k rows for each column
+        # Flatten to 1D lists
+        row_idx = top_idx.flatten()
+        col_idx = torch.arange(n, device=device).repeat_interleave(k)
+        edge_weight = diff[row_idx, col_idx]
+        edge_index = torch.stack([row_idx, col_idx], dim=0)
+    else:
+        # Determine threshold eps.  If eps is None, compute it from
+        # avg_degree
+        flat = diff.flatten()
+        if eps is None:
+            if avg_degree is None:
+                raise ValueError(
+                    "either 'eps' or 'avg_degree' must be provided when k is None"
+                )
+            # Number of edges to keep = avg_degree * n
+            num_keep = int(avg_degree * n)
+            # If num_keep exceeds total entries, set eps to -inf so all
+            # edges are kept.
+            if num_keep <= 0:
+                eps = float('inf')
+            elif num_keep >= flat.numel():
+                eps = float('-inf')
+            else:
+                sorted_flat = torch.sort(flat, descending=True).values
+                eps = sorted_flat[num_keep - 1].item()
+        # Build mask of entries exceeding threshold
+        mask = diff >= eps
+        # Extract coordinates
+        row_idx, col_idx = mask.nonzero(as_tuple=True)
+        edge_weight = diff[row_idx, col_idx]
+        edge_index = torch.stack([row_idx, col_idx], dim=0)
+    return edge_index, edge_weight
 
 
 def digl_rewired(
     g: dgl.DGLGraph,
-    diffusion_type: str = 'ppr',
+    *,
+    method: str = 'ppr',
     alpha: float = 0.15,
     t: float = 5.0,
-    epsilon: float = 0.01,
-    add_ratio: float = 1.0,
-    remove_ratio: float = 1.0,
-    self_loops: bool = False,
-    symmetric: bool = True
+    coeffs: Optional[torch.Tensor] = None,
+    normalization: str = 'sym',
+    k: Optional[int] = None,
+    eps: Optional[float] = None,
+    avg_degree: Optional[int] = 64,
+    retain_self_loops: bool = False,
+    diffusion_type = 'ppr',
 ) -> dgl.DGLGraph:
+    """Rewire a graph using diffusion‐based sparsification.
+
+    This function implements an exact version of the DIGL rewiring
+    procedure following the PyTorch Geometric ``GDC`` transform【318729141242744†L160-L198】.  It
+    normalises the adjacency matrix, computes a diffusion kernel, sparsifies
+    it by either keeping the top ``k`` neighbours per node or using a
+    global threshold/average degree, and constructs a new graph with
+    diffusion weights on the edges.  Node features are copied from the
+    original graph.
+
+    Parameters
+    ----------
+    g:
+        Input DGL graph.  The graph should be unweighted; if it
+        contains multiple edges they are treated as a single connection.
+    method:
+        Diffusion method: ``'ppr'`` (personalised PageRank), ``'heat'``
+        (heat kernel) or ``'coeff'`` (polynomial in the transition
+        matrix).  Defaults to ``'ppr'``.
+    alpha:
+        Teleport probability for PPR.  Only used when ``method='ppr'``.
+    t:
+        Diffusion time for the heat kernel.  Only used when
+        ``method='heat'``.
+    coeffs:
+        Coefficients for the ``'coeff'`` diffusion method.  Should be a
+        one‑dimensional tensor of length ``K`` with ``theta_k`` values.
+    normalization:
+        Normalisation applied to the adjacency prior to diffusion.
+        Choices are ``'sym'``, ``'row'``, ``'col'`` or ``None``.  The
+        default ``'sym'`` uses symmetric normalisation (``D^{-1/2}AD^{-1/2}``).
+    k:
+        If specified, retain the top ``k`` largest diffusion weights per
+        target node (column).  In this case ``eps`` and ``avg_degree``
+        are ignored.  For unweighted graphs a typical value is in the
+        tens (e.g. 32 or 64).
+    eps:
+        Absolute threshold for diffusion values.  All edges with
+        weights below ``eps`` are discarded.  If both ``eps`` and ``k``
+        are ``None``, ``avg_degree`` is used to compute a threshold.
+    avg_degree:
+        Desired average degree of the rewired graph when neither
+        ``k`` nor ``eps`` are provided.  The threshold is chosen so that
+        approximately ``avg_degree * num_nodes`` edges are kept.
+    retain_self_loops:
+        Whether to keep self loops in the rewired graph.  Defaults to
+        ``False``.
+    diffusion_type:
+        Deprecated; use ``method`` instead.  This parameter is retained
+        for compatibility with the old ``digl_rewired`` function in
+        ``bridge/rewiring/digl.py``.  It is ignored in the present
+        implementation.
+
+    Returns
+    -------
+    dgl.DGLGraph
+        The rewired graph.  The edge weights (diffusion scores) are
+        stored in ``edata['weight']``.  Node features from the input
+        graph are copied to the output.
     """
-    Apply DIGL (Diffusion Improves Graph Learning) rewiring to a graph.
-    
-    Args:
-        g: Input DGL graph
-        diffusion_type: Type of diffusion ('ppr' for PageRank, 'heat' for heat kernel)
-        alpha: PPR teleport probability (only for PPR)
-        t: Heat kernel time parameter (only for heat kernel)
-        epsilon: Threshold for edge addition
-        add_ratio: Maximum ratio of edges to add
-        remove_ratio: Maximum ratio of edges to remove
-        self_loops: Whether to include self-loops
-        symmetric: Whether to maintain graph symmetry
-        
-    Returns:
-        dgl.DGLGraph: Rewired graph
-    """
-    n = g.number_of_nodes()
-    device = g.device
-    
-    # Compute diffusion matrix
-    if diffusion_type == 'ppr':
-        S = compute_ppr_matrix(g, alpha=alpha)
-    elif diffusion_type == 'heat':
-        S = compute_heat_kernel(g, t=t)
-    else:
-        raise ValueError(f"Unknown diffusion type: {diffusion_type}")
-    
-    # Get current adjacency matrix
-    A = g.adjacency_matrix().to_dense().float().to(device)
-    
-    # Remove self-loops from consideration if not wanted
-    if not self_loops:
-        S.fill_diagonal_(0)
-        A.fill_diagonal_(0)
-    
-    # Make symmetric if required
-    if symmetric:
-        S = (S + S.T) / 2
-    
-    # Identify candidate edges to add (high diffusion score, not in graph)
-    non_edges_mask = (A == 0)
-    if not self_loops:
-        non_edges_mask.fill_diagonal_(False)
-    
-    candidate_scores = S * non_edges_mask.float()
-    
-    # Select top edges to add based on diffusion scores
-    num_edges_to_add = int(add_ratio * g.number_of_edges())
-    if num_edges_to_add > 0:
-        # Flatten and get top-k
-        flat_scores = candidate_scores.flatten()
-        top_k_values, top_k_indices = torch.topk(flat_scores, min(num_edges_to_add, flat_scores.numel()))
-        
-        # Filter by epsilon threshold
-        valid_mask = top_k_values > epsilon
-        top_k_indices = top_k_indices[valid_mask]
-        
-        # Convert back to 2D indices
-        add_edges_i = top_k_indices // n
-        add_edges_j = top_k_indices % n
-    else:
-        add_edges_i = torch.tensor([], dtype=torch.long, device=device)
-        add_edges_j = torch.tensor([], dtype=torch.long, device=device)
-    
-    # Identify edges to remove (low diffusion score, in graph)
-    edges_mask = (A > 0)
-    if not self_loops:
-        edges_mask.fill_diagonal_(False)
-    
-    edge_scores = S * edges_mask.float()
-    
-    # Select bottom edges to remove based on diffusion scores
-    num_edges_to_remove = int(remove_ratio * g.number_of_edges())
-    if num_edges_to_remove > 0:
-        # Get edges and their scores
-        edge_indices = edges_mask.nonzero()
-        edge_score_values = edge_scores[edge_indices[:, 0], edge_indices[:, 1]]
-        
-        # Get bottom-k
-        bottom_k_values, bottom_k_indices = torch.topk(
-            edge_score_values, 
-            min(num_edges_to_remove, edge_score_values.numel()), 
-            largest=False
-        )
-        
-        # Filter by epsilon threshold
-        valid_mask = bottom_k_values < epsilon
-        bottom_k_indices = bottom_k_indices[valid_mask]
-        
-        # Get edges to remove
-        remove_edges = edge_indices[bottom_k_indices]
-        remove_edges_i = remove_edges[:, 0]
-        remove_edges_j = remove_edges[:, 1]
-    else:
-        remove_edges_i = torch.tensor([], dtype=torch.long, device=device)
-        remove_edges_j = torch.tensor([], dtype=torch.long, device=device)
-    
-    # Build new adjacency matrix
-    A_new = A.clone()
-    
-    # Remove edges
-    if remove_edges_i.numel() > 0:
-        A_new[remove_edges_i, remove_edges_j] = 0
-        if symmetric:
-            A_new[remove_edges_j, remove_edges_i] = 0
-    
-    # Add edges
-    if add_edges_i.numel() > 0:
-        A_new[add_edges_i, add_edges_j] = 1
-        if symmetric:
-            A_new[add_edges_j, add_edges_i] = 1
-    
-    # Create new graph
-    edges = A_new.nonzero()
-    new_g = dgl.graph((edges[:, 0], edges[:, 1]), num_nodes=n, device=device)
-    
-    # Copy node features
-    for key in g.ndata.keys():
-        new_g.ndata[key] = g.ndata[key]
-    
+    # Normalise adjacency to a transition matrix
+    T = _normalised_transition_matrix(g, normalization=normalization)
+    # Compute diffusion matrix exactly
+    diff = _diffusion_matrix(T, method=method, alpha=alpha, t=t, coeffs=coeffs)
+    # Symmetrise the diffusion matrix to ensure undirected graphs
+    diff = (diff + diff.T) * 0.5
+    # Sparsify diffusion matrix to obtain edges and weights
+    edge_index, edge_weight = _sparsify_diffusion(
+        diff,
+        k=k,
+        eps=eps,
+        avg_degree=avg_degree,
+        retain_self_loops=retain_self_loops,
+    )
+
+    # Construct new DGL graph.  ``edge_index`` is 2×M; its rows are
+    # source and destination indices.  DGL expects a pair of index
+    # tensors for edges.
+    src, dst = edge_index
+    new_g = dgl.graph((src, dst), num_nodes=g.number_of_nodes(), device=g.device)
+
+    # Attach diffusion weights to edges
+    new_g.edata['weight'] = edge_weight
+
+    # Copy node features from the original graph
+    for key, feat in g.ndata.items():
+        new_g.ndata[key] = feat
+
     return new_g

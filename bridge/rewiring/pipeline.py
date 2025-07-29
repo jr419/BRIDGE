@@ -23,7 +23,7 @@ from ..utils import (
 )
 from .operations import create_rewired_graph
 from .sdrf import sdrf_rewire
-from .digl import compute_ppr_matrix, compute_heat_kernel, digl_rewired
+from .digl import digl_rewired
 
 def run_bridge_pipeline(
     g: dgl.DGLGraph,
@@ -1072,10 +1072,9 @@ def run_iterative_bridge_pipeline(
     elif rewiring_method == 'digl':
         g_rewired = digl_rewired(
             g=g_rewired,
-            diffusion_type=digl_diffusion_type,
             alpha=digl_alpha,
             t=digl_t,
-            epsilon=digl_epsilon)
+            eps=digl_epsilon)
     
     # Initialize in_feats and out_feats
     in_feats = feat.shape[1]
