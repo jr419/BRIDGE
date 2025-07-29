@@ -946,8 +946,9 @@ def run_iterative_bridge_pipeline(
     c_plus: float = 0.0,
     digl_diffusion_type: str = 'ppr',
     digl_alpha: float = 0.15,
+    digl_k: int = 64,
     digl_t: float = 5.0,
-    digl_epsilon: float = 0.01,
+    digl_epsilon: float = 0.0001,
     simulated_acc: Optional[float] = None
 ) -> Dict[str, Any]:
     """
@@ -1002,6 +1003,7 @@ def run_iterative_bridge_pipeline(
         c_plus: Parameter for SDRF rewiring
         digl_diffusion_type: Type of diffusion for DIGL ('ppr' or 'random_walk')
         digl_alpha: Alpha parameter for PPR diffusion
+        digl_k: Number of neighbors for DIGL diffusion
         digl_t: Time parameter for DIGL diffusion
         digl_epsilon: Epsilon parameter for DIGL diffusion
         simulated_acc: Optional float between 0 and 1 representing the accuracy of simulated predictions. 
@@ -1072,7 +1074,9 @@ def run_iterative_bridge_pipeline(
     elif rewiring_method == 'digl':
         g_rewired = digl_rewired(
             g=g_rewired,
+            method=digl_diffusion_type,
             alpha=digl_alpha,
+            k = digl_k,
             t=digl_t,
             eps=digl_epsilon)
     
@@ -1350,8 +1354,9 @@ def run_iterative_bridge_experiment(
     c_plus: float = 0.0,
     digl_diffusion_type: str = 'ppr',
     digl_alpha: float = 0.15,
+    digl_k: int = 64,
     digl_t: float = 5.0,
-    digl_epsilon: float = 0.01,
+    digl_epsilon: float = 0.0001,
     simulated_acc: Optional[float] = None
     
 ) -> Tuple[Dict[str, Any], List[Dict[str, Any]]]:
@@ -1482,6 +1487,7 @@ def run_iterative_bridge_experiment(
             c_plus=c_plus,
             digl_diffusion_type=digl_diffusion_type,
             digl_alpha=digl_alpha,
+            digl_k=digl_k,
             digl_t=digl_t,
             digl_epsilon=digl_epsilon,
             simulated_acc=simulated_acc

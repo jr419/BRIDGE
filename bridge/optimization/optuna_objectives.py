@@ -579,6 +579,7 @@ def objective_iterative_rewiring(
     sdrf_c_plus_range: list = [0, 50],
     digl_diffusion_type='ppr',
     digl_alpha_range=[0.05, 0.25],
+    digl_k_options=[32, 64, 128],
     digl_t_range=[1.0, 10.0],
     digl_epsilon_range=[0.001, 0.1],
     simulated_acc: Optional[float] = None
@@ -791,6 +792,12 @@ def objective_iterative_rewiring(
         'digl_alpha',
         param_type="float"
     )
+    digl_k = trial_suggest_or_fixed(
+        trial,
+        digl_k_options,
+        'digl_k',
+        param_type="categorical"
+    )
     digl_t = trial_suggest_or_fixed(
         trial,
         digl_t_range,
@@ -848,6 +855,7 @@ def objective_iterative_rewiring(
         c_plus=c_plus,
         digl_diffusion_type=digl_diffusion_type,
         digl_alpha=digl_alpha,
+        digl_k=digl_k,
         digl_t=digl_t,
         digl_epsilon=digl_epsilon,
         simulated_acc=simulated_acc,
@@ -889,6 +897,7 @@ def objective_iterative_rewiring(
     
     trial.set_user_attr('digl_diffusion_type', digl_diffusion_type)
     trial.set_user_attr('digl_alpha', digl_alpha)
+    trial.set_user_attr('digl_k', digl_k)
     trial.set_user_attr('digl_t', digl_t)
     trial.set_user_attr('digl_epsilon', digl_epsilon)
     

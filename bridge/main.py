@@ -137,6 +137,8 @@ def parse_args():
                         help='Heat kernel time parameter range for DIGL')
     parser.add_argument('--digl_epsilon_range', nargs=2, type=float, default=[0.001, 0.1],
                         help='Threshold range for edge addition/removal in DIGL')
+    parser.add_argument('--digl_k_options', nargs='+', type=int, default=[32, 64, 128],
+                        help='Threshold range for edge addition/removal in DIGL')
 
 
 
@@ -447,6 +449,7 @@ def run_rewiring_experiment(args):
                             sdrf_c_plus_range=args.sdrf_c_plus_range,
                             digl_diffusion_type=args.digl_diffusion_type,
                             digl_alpha_range=args.digl_alpha_range,
+                            digl_k_options=args.digl_k_options,
                             digl_t_range=args.digl_t_range,
                             digl_epsilon_range=args.digl_epsilon_range,
                             simulated_acc=args.simulated_acc
@@ -573,6 +576,7 @@ def run_rewiring_experiment(args):
                 if  args.rewiring_method == 'digl':
                     # Extract DIGL parameters
                     digl_alpha = best_rewiring_params.get('digl_alpha', best_rewiring_attributes.get('digl_alpha'))
+                    digl_k = best_rewiring_params.get('digl_k', best_rewiring_attributes.get('digl_k'))
                     digl_t = best_rewiring_params.get('digl_t', best_rewiring_attributes.get('digl_t'))
                     digl_epsilon = best_rewiring_params.get('digl_epsilon', best_rewiring_attributes.get('digl_epsilon'))
                     digl_diffusion_type = best_rewiring_params.get('digl_diffusion_type', best_rewiring_attributes.get('digl_diffusion_type', 'ppr'))
@@ -648,6 +652,7 @@ def run_rewiring_experiment(args):
                         sdrf_iterations=sdrf_iterations,
                         c_plus=sdrf_c_plus,
                         digl_alpha=digl_alpha,
+                        digl_k=digl_k,
                         digl_t=digl_t,
                         digl_epsilon=digl_epsilon,
                         digl_diffusion_type=digl_diffusion_type,

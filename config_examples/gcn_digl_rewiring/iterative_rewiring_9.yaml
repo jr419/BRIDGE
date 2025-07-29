@@ -9,9 +9,10 @@ rewiring_method: "digl"
 
 # DIGL-specific parameters
 digl_diffusion_type: ppr  # Options: 'ppr' or 'heat'
-digl_alpha_range: [0.05, 0.25]  # PPR teleport probability range
+digl_alpha_range: [0.05, 0.30]  # PPR teleport probability range
 digl_t_range: [1.0, 10.0]  # Heat kernel time parameter range
-digl_epsilon_range: [0.001, 0.1]  # Edge threshold range
+digl_epsilon_range: [0.00001, 0.001] 
+digl_k_options: [32, 64, 128]
 digl_add_ratio_range: [1.0, 1.0]  # Ratio of edges to add
 digl_remove_ratio_range: [1.0, 1.0]  # Ratio of edges to remove
 
