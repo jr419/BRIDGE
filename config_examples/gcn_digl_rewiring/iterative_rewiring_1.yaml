@@ -19,8 +19,8 @@ digl_remove_ratio_range: [1.0, 1.0]  # Ratio of edges to remove
 # General settings
 seed: 42
 device: "cuda"
-num_trials: 2
-num_splits: 2
+num_trials: 10
+num_splits: 3
 early_stopping: 50
 
 # Model settings
