@@ -79,22 +79,6 @@ def parse_args():
                         help='Learning rate range for MPNN [min, max]')
     parser.add_argument('--wd_mpnn_range', nargs=2, type=float, default=[1e-5, 0.1],
                         help='Weight decay range for MPNN [min, max]')
-    parser.add_argument('--temperature_range', nargs=2, type=float, default=[1e-5, 2.0],
-                        help='Temperature range for softmax [min, max]')
-    parser.add_argument('--p_add_range', nargs=2, type=float, default=[0.0, 1.0],
-                        help='Probability range for adding edges [min, max]')
-    parser.add_argument('--p_remove_range', nargs=2, type=float, default=[0.0, 1.0],
-                        help='Probability range for removing edges [min, max]')
-    parser.add_argument('--h_feats_selective_options', nargs='+', type=int, default=[16, 32, 64, 128],
-                        help='Hidden feature dimensions to try for selective MPNN')
-    parser.add_argument('--n_layers_selective_options', nargs='+', type=int, default=[1, 2, 3],
-                        help='Number of layers to try for selective MPNN')
-    parser.add_argument('--dropout_selective_range', nargs=2, type=float, default=[0.0, 0.7],
-                        help='Dropout range for selective MPNN [min, max]')
-    parser.add_argument('--lr_selective_range', nargs=2, type=float, default=[1e-5, 0.1],
-                        help='Learning rate range for selective MPNN [min, max]')
-    parser.add_argument('--wd_selective_range', nargs=2, type=float, default=[1e-5, 0.1],
-                        help='Weight decay range for selective MPNN [min, max]')
     
     # Iterative rewiring parameters
     parser.add_argument('--use_iterative_rewiring', action='store_true', 
@@ -430,19 +414,6 @@ def run_rewiring_experiment(args):
                             do_self_loop=args.do_self_loop,
                             do_residual_connections=args.do_residual,
                             dataset_name=dataset_name,
-                            temperature_range=args.temperature_range,
-                            p_add_range=args.p_add_range,
-                            p_remove_range=args.p_remove_range,
-                            h_feats_selective_options=args.h_feats_selective_options,
-                            n_layers_selective_options=args.n_layers_selective_options,
-                            dropout_selective_range=args.dropout_selective_range,
-                            lr_selective_range=args.lr_selective_range,
-                            wd_selective_range=args.wd_selective_range,
-                            n_rewire_iterations_range=args.n_rewire_iterations_range,
-                            use_sgc=args.use_sgc,
-                            sgc_K_options=args.sgc_K_options,
-                            sgc_wd_range=args.sgc_wd_range,
-                            sgc_lr_range=args.sgc_lr_range,
                             rewiring_method=args.rewiring_method,
                             sdrf_tau_range=args.sdrf_tau_range,
                             sdrf_n_iterations_range=args.sdrf_iterations_range,
@@ -467,15 +438,7 @@ def run_rewiring_experiment(args):
                             do_hp=do_hp,
                             do_self_loop=args.do_self_loop,
                             do_residual_connections=args.do_residual,
-                            dataset_name=dataset_name,
-                            temperature_range=args.temperature_range,
-                            p_add_range=args.p_add_range,
-                            p_remove_range=args.p_remove_range,
-                            h_feats_selective_options=args.h_feats_selective_options,
-                            n_layers_selective_options=args.n_layers_selective_options,
-                            dropout_selective_range=args.dropout_selective_range,
-                            lr_selective_range=args.lr_selective_range,
-                            wd_selective_range=args.wd_selective_range
+                            dataset_name=dataset_name
                         )
                 
                 # Create and run study for rewiring optimization
@@ -539,9 +502,6 @@ def run_rewiring_experiment(args):
                 # Apply best rewiring strategy to the graph
                 matrix_idx = best_rewiring_params.get('matrix_idx', best_rewiring_attributes.get('matrix_idx'))
                 P_k = all_matrices[matrix_idx]
-                p_add = best_rewiring_params.get('p_add', best_rewiring_attributes.get('p_add'))
-                p_remove = best_rewiring_params.get('p_remove', best_rewiring_attributes.get('p_remove'))
-                temperature = best_rewiring_params.get('temperature', best_rewiring_attributes.get('temperature'))
                 d_out = best_rewiring_params.get('d_out', best_rewiring_attributes.get('d_out'))
                 
                 # Select MPNN hyperparameters
@@ -551,19 +511,11 @@ def run_rewiring_experiment(args):
                 model_lr_mpnn = best_mpnn_params.get('model_lr', best_mpnn_attributes.get('model_lr'))#['model_lr']
                 wd_mpnn = best_mpnn_params.get('weight_decay', best_mpnn_attributes.get('weight_decay'))#['weight_decay']
                 
-                # Select selective MPNN hyperparameters
-                h_feats_sel = best_rewiring_params.get('h_feats_selective', best_rewiring_attributes.get('h_feats_selective'))
-                n_layers_sel = best_rewiring_params.get('n_layers_selective', best_rewiring_attributes.get('n_layers_selective'))
-                dropout_p_sel = best_rewiring_params.get('dropout_p_selective', best_rewiring_attributes.get('dropout_p_selective'))
-                model_lr_sel = best_rewiring_params.get('model_lr_selective', best_rewiring_attributes.get('model_lr_selective'))
-                wd_sel = best_rewiring_params.get('weight_decay_selective', best_rewiring_attributes.get('weight_decay_selective'))
-                n_rewire_iterations = best_rewiring_params.get('n_rewire_iterations', best_rewiring_attributes.get('n_rewire_iterations'))
-
                 if args.use_iterative_rewiring:
                     sgc_K = best_rewiring_params.get('sgc_K', best_rewiring_attributes.get('sgc_K'))
                     sgc_wd = best_rewiring_params.get('sgc_wd', best_rewiring_attributes.get('sgc_wd'))
                     sgc_lr = best_rewiring_params.get('sgc_lr', best_rewiring_attributes.get('sgc_lr'))
-                    
+                
                 if args.rewiring_method == 'sdrf':
                     sdrf_tau = best_rewiring_params.get('sdrf_tau', best_rewiring_attributes.get('sdrf_tau'))
                     sdrf_iterations = best_rewiring_params.get('sdrf_iterations', best_rewiring_attributes.get('sdrf_iterations'))
@@ -623,14 +575,6 @@ def run_rewiring_experiment(args):
                         dropout_p_mpnn=dropout_p_mpnn,
                         model_lr_mpnn=model_lr_mpnn,
                         wd_mpnn=wd_mpnn,
-                        h_feats_selective=h_feats_sel,
-                        n_layers_selective=n_layers_sel,
-                        dropout_p_selective=dropout_p_sel,
-                        model_lr_selective=model_lr_sel,
-                        wd_selective=wd_sel,
-                        temperature=temperature,
-                        p_add=p_add,
-                        p_remove=p_remove,
                         d_out=d_out,
                         num_graphs=1,
                         device=device,
@@ -669,14 +613,6 @@ def run_rewiring_experiment(args):
                         dropout_p_mpnn=dropout_p_mpnn,
                         model_lr_mpnn=model_lr_mpnn,
                         wd_mpnn=wd_mpnn,
-                        h_feats_selective=h_feats_sel,
-                        n_layers_selective=n_layers_sel,
-                        dropout_p_selective=dropout_p_sel,
-                        model_lr_selective=model_lr_sel,
-                        wd_selective=wd_sel,
-                        temperature=temperature,
-                        p_add=p_add,
-                        p_remove=p_remove,
                         d_out=d_out,
                         num_graphs=1,
                         device=device,

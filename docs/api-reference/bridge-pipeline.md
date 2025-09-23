@@ -19,27 +19,21 @@ parent: API Reference
 
 The `run_bridge_pipeline` function implements the complete BRIDGE (Block Rewiring from Inference-Derived Graph Ensembles) pipeline. This pipeline optimizes graph neural networks through inference-derived graph rewiring.
 
+Rewiring now always uses hard predictions (argmax over logits) and fully resamples the adjacency from optimal edge probabilities. There is no temperature parameter and no p_add/p_remove. The pipeline trains a standard model only (no selective models).
+
 ## Function Signature
 
 ```python
 def run_bridge_pipeline(
     g: dgl.DGLGraph,
     P_k: np.ndarray,
-    h_feats_gcn: int = 64,
-    n_layers_gcn: int = 2,
-    dropout_p_gcn: float = 0.5,
-    model_lr_gcn: float = 1e-3,
-    wd_gcn: float = 0.0,
-    h_feats_selective: int = 64,
-    n_layers_selective: int = 2,
-    dropout_p_selective: float = 0.5,
-    model_lr_selective: float = 1e-3,
-    wd_selective: float = 0.0,
+    h_feats_mpnn: int = 64,
+    n_layers_mpnn: int = 2,
+    dropout_p_mpnn: float = 0.5,
+    model_lr_mpnn: float = 1e-3,
+    wd_mpnn: float = 0.0,
     n_epochs: int = 1000,
     early_stopping: int = 50,
-    temperature: float = 1.0,
-    p_add: float = 0.1,
-    p_remove: float = 0.1,
     d_out: float = 10,
     num_graphs: int = 1,
     device: Union[str, torch.device] = 'cpu',
@@ -61,21 +55,13 @@ def run_bridge_pipeline(
 |-----------|------|-------------|
 | `g` | dgl.DGLGraph | Input graph |
 | `P_k` | np.ndarray | Permutation matrix for rewiring |
-| `h_feats_gcn` | int | Hidden feature dimension for the base GCN |
-| `n_layers_gcn` | int | Number of layers for the base GCN |
-| `dropout_p_gcn` | float | Dropout probability for the base GCN |
-| `model_lr_gcn` | float | Learning rate for the base GCN |
-| `wd_gcn` | float | Weight decay for the base GCN |
-| `h_feats_selective` | int | Hidden feature dimension for the selective GCN |
-| `n_layers_selective` | int | Number of layers for the selective GCN |
-| `dropout_p_selective` | float | Dropout probability for the selective GCN |
-| `model_lr_selective` | float | Learning rate for the selective GCN |
-| `wd_selective` | float | Weight decay for the selective GCN |
+| `h_feats_mpnn` | int | Hidden feature dimension for the base model |
+| `n_layers_mpnn` | int | Number of layers for the base model |
+| `dropout_p_mpnn` | float | Dropout probability for the base model |
+| `model_lr_mpnn` | float | Learning rate for the base model |
+| `wd_mpnn` | float | Weight decay for the base model |
 | `n_epochs` | int | Maximum number of training epochs |
 | `early_stopping` | int | Number of epochs to look back for early stopping |
-| `temperature` | float | Temperature for softmax when computing class probabilities |
-| `p_add` | float | Probability of adding new edges during rewiring |
-| `p_remove` | float | Probability of removing existing edges during rewiring |
 | `d_out` | float | Desired output mean degree |
 | `num_graphs` | int | Number of rewired graphs to generate |
 | `device` | Union[str, torch.device] | Device to perform computations on |
@@ -95,8 +81,8 @@ A dictionary containing the following keys:
 
 | Key | Description |
 |-----|-------------|
-| `cold_start` | Results for the base GCN including train/val/test accuracy |
-| `selective` | Results for the selective GCN including train/val/test accuracy |
+| `cold_start` | Results for the base model including train/val/test accuracy |
+| `rewired` | Results for the standard model trained on the rewired graph |
 | `original_stats` | Statistics for the original graph (nodes, edges, degree, homophily) |
 | `rewired_stats` | Statistics for the rewired graph (nodes, edges, degree, homophily, edges added/removed) |
 
@@ -104,11 +90,11 @@ A dictionary containing the following keys:
 
 The `run_bridge_pipeline` function implements the following steps:
 
-1. **Cold-Start GCN Training**: Trains a base GCN on the original graph
-2. **Class Probability Prediction**: Uses the trained GCN to infer node classes
-3. **Optimal Block Matrix Computation**: Computes an optimal block matrix for rewiring
-4. **Graph Rewiring**: Rewires the graph based on the optimal block matrix
-5. **Selective GCN Training**: Trains a selective GCN on both the original and rewired graphs
+1. Cold-Start model training on the original graph
+2. Hard class prediction (argmax over logits, no temperature)
+3. Optimal block matrix computation
+4. Graph rewiring via full resampling from optimal probabilities
+5. Train a standard model on the rewired graph
 
 ## Example Usage
 
@@ -126,38 +112,29 @@ g = dataset[0]
 # Generate permutation matrices
 k = len(torch.unique(g.ndata['label']))
 all_matrices = generate_all_symmetric_permutation_matrices(k)
-P_k = all_matrices[0]  # Choose the first permutation matrix
+P_k = all_matrices[0]
 
 # Run the rewiring pipeline
 results = run_bridge_pipeline(
     g=g,
     P_k=P_k,
-    h_feats_gcn=64,
-    n_layers_gcn=2,
-    dropout_p_gcn=0.5,
-    model_lr_gcn=1e-3,
-    h_feats_selective=64,
-    n_layers_selective=2,
-    dropout_p_selective=0.5,
-    model_lr_selective=1e-3,
-    temperature=1.0,
-    p_add=0.1,
-    p_remove=0.1,
+    h_feats_mpnn=64,
+    n_layers_mpnn=2,
+    dropout_p_mpnn=0.5,
+    model_lr_mpnn=1e-3,
     d_out=10,
     num_graphs=1,
     device='cuda' if torch.cuda.is_available() else 'cpu'
 )
 
-# Print the results
 print(f"Original Graph: Nodes={results['original_stats']['num_nodes']}, Edges={results['original_stats']['num_edges']}")
 print(f"Rewired Graph: Nodes={results['rewired_stats']['num_nodes']}, Edges={results['rewired_stats']['num_edges']}")
-print(f"Base GCN Test Accuracy: {results['cold_start']['test_acc']:.4f}")
-print(f"Selective GCN Test Accuracy: {results['selective']['test_acc']:.4f}")
+print(f"Base Test Accuracy: {results['cold_start']['test_acc']:.4f}")
+print(f"Rewired Test Accuracy: {results['rewired']['test_acc']:.4f}")
 ```
 
 ## Notes
 
-- The `P_k` permutation matrix determines the optimal block structure for connecting different classes. Different permutation matrices can lead to different rewiring patterns.
-- The `temperature` parameter controls the sharpness of the softmax function when converting logits to class probabilities. Lower values produce more confident (sharper) distributions.
-- The `p_add` and `p_remove` parameters control how aggressive the rewiring process is. Higher values lead to more edge modifications.
-- The `do_hp` parameter enables the use of high-pass filters, which can be beneficial for heterophilic graphs.
+- `P_k` determines the optimal block structure across classes.
+- Predictions are hard; there is no softmax temperature and no partial add/remove probabilities.
+- The `do_hp` parameter enables high-pass filters, which can be beneficial for heterophilic graphs.

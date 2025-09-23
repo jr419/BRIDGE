@@ -264,8 +264,8 @@ for i, P_k in enumerate(all_matrices):
         P_k=P_k,
         # other parameters...
     )
-    results.append(result['selective']['test_acc'])
-    print(f"Matrix {i+1}: Test accuracy = {result['selective']['test_acc']:.4f}")
+    results.append(result['rewired']['test_acc'])
+    print(f"Matrix {i+1}: Test accuracy = {result['rewired']['test_acc']:.4f}")
 
 # Compute confidence interval
 mean, lower, upper = compute_confidence_interval(results)

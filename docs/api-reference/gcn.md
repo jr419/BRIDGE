@@ -147,4 +147,3 @@ Note that if `do_hp` is True, the architecture changes to use high-pass filters,
 ## Related Components
 
 - [HPGraphConv](api-reference/hpgraphconv.html): High-Pass Graph Convolution layer used when `do_hp=True`
-- [SelectiveGCN](api-reference/selectivegcn.html): Extension of GCN that can operate on multiple graph versions

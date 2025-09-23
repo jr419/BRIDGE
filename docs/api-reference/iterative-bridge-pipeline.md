@@ -5,40 +5,21 @@ parent: API Reference
 ---
 
 # run_iterative_bridge_pipeline
-{: .no_toc }
 
-## Table of contents
-{: .no_toc .text-delta }
-
-1. TOC
-{:toc}
-
----
-
-## Overview
-
-The `run_iterative_bridge_pipeline` function performs multiple rewiring rounds,
-progressively modifying the graph before training a final SelectiveGCN. It uses a
-fast SGC-based classifier for early iterations to speed up computation.
-
-## Function Signature
-
-```python
-from bridge.rewiring import run_iterative_bridge_pipeline
-```
-
-Refer to the Python docstring for full parameter details. Important options
-include `n_rewire` (number of rewiring iterations) and `use_sgc` to enable the
-fast SGC classifier during the iterative phase.
+The iterative BRIDGE pipeline progressively modifies the graph using repeated rewiring steps, then trains a standard model on the final rewired graph. Predictions are hard labels and rewiring fully resamples the adjacency. No temperature or partial add/remove probabilities are used.
 
 ## Example Usage
 
 ```python
+from bridge.rewiring import run_iterative_bridge_pipeline
+
 results = run_iterative_bridge_pipeline(
-    g=g,
-    P_k=P_k,
+    g,
+    P_k,
+    model_type='GCN',
     n_rewire=5,
-    device="cuda",
+    d_out=10,
 )
-print(results["selective"]["test_acc"])
+
+print(results["rewired"]["test_acc"])
 ```

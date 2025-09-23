@@ -407,14 +407,12 @@ from bridge.rewiring import create_rewired_graph
 is_symmetric = check_symmetry(g)
 sym_type = 'upper' if is_symmetric else 'asymetric'
 
-# Create a rewired graph
+# Create a rewired graph (full resampling, hard predictions)
 g_rewired = create_rewired_graph(
     g=g,
     B_opt_tensor=B_opt_tensor,
     pred=pred,
     Z_pred=Z_pred,
-    p_remove=0.1,
-    p_add=0.1,
     sym_type=sym_type
 )
 

@@ -1,11 +1,12 @@
 ---
 layout: default
-title: homophily_metrics
+title: Homophily Metrics
 parent: API Reference
 ---
 
-# homophily_metrics
-{: .no_toc }
+# Homophily Metrics
+
+Documentation for computing local and global homophily metrics.
 
 ## Table of contents
 {: .no_toc .text-delta }
@@ -268,8 +269,7 @@ In the BRIDGE rewiring pipeline, homophily metrics are used to:
 
 1. Evaluate the quality of the original graph
 2. Guide the rewiring process to increase higher-order homophily
-3. Create node masks for the selective GCN based on local homophily
-4. Analyze the improvement in homophily after rewiring
+3. Analyze the improvement in homophily after rewiring
 
 Example:
 

@@ -15,28 +15,27 @@ def create_rewired_graph(
     B_opt_tensor: torch.Tensor,
     pred: torch.Tensor,
     Z_pred: torch.Tensor,
-    p_remove: float,
-    p_add: float,
     sym_type: str = 'upper',
     device: Union[str, torch.device] = 'cpu'
 ) -> dgl.DGLGraph:
     """
-    Create a rewired version of a graph using predicted class probabilities
+    Create a rewired version of a graph using predicted class assignments
     and an optimal block matrix.
     
+    This implementation always fully resamples the adjacency according to the
+    optimal probabilities (i.e., full resampling). We use hard predictions
+    (one-hot Z_pred). No temperature, p_add, or p_remove are used.
+    
     The rewiring process:
-    1. Computes optimal edge probabilities based on the provided block matrix and node embeddings
-    2. Removes existing edges with probability p_remove * (1 - optimal_prob)
-    3. Adds new edges with probability p_add * optimal_prob
-    4. Ensures the resulting graph maintains desired symmetry properties
+    1. Computes optimal edge probabilities based on the provided block matrix and node assignments
+    2. Samples every potential edge independently from Bernoulli(A_opt_p)
+    3. Ensures the resulting graph maintains desired symmetry properties
     
     Args:
         g: Original graph to rewire
         B_opt_tensor: Optimal block matrix
-        pred: Predicted class labels for each node
-        Z_pred: Predicted class probabilities for each node (softmax outputs)
-        p_remove: Probability of removing existing edges
-        p_add: Probability of adding new edges
+        pred: Predicted class labels for each node (hard assignments)
+        Z_pred: One-hot class assignments for each node
         sym_type: Type of symmetry to enforce ('upper', 'lower', or 'asymetric')
         device: Device to perform computations on
         
@@ -49,29 +48,23 @@ def create_rewired_graph(
     # ========== Compute Edge Probabilities ==========
     A_opt_p = (Z_pred.cpu() @ B_opt_tensor.cpu() @ Z_pred.cpu().T) / n_nodes
 
-    # Get current adjacency matrix
-    A_old = g.cpu().adj().to_dense()
+    # Clamp probabilities to valid range and handle NaNs
+    A_opt_p = torch.clamp(A_opt_p, 0, 1)
+    A_opt_p[torch.isnan(A_opt_p)] = 0
+    # Do not allow self-loop probabilities
+    A_opt_p.fill_diagonal_(0)
 
-    # ========== Likelihood-based Rewiring ==========
-    # Compute new edge probabilities:
-    # - For existing edges: keep with prob (1 - p_remove * (1 - A_opt_p))
-    # - For non-existing edges: add with prob (p_add * A_opt_p)
-    A_p = A_old * (1 - p_remove * (1 - A_opt_p)) + (1 - A_old) * A_opt_p * p_add
-    
-    # Clamp probabilities to avoid numerical errors
-    A_p = torch.clamp(A_p, 0, 1)
-
-    # Handle NaN values by setting them to 0
-    A_p[torch.isnan(A_p)] = 0
-
-    # Sample new adjacency matrix
-    A = torch.bernoulli(A_p)
+    # ========== Full Resampling ==========
+    A = torch.bernoulli(A_opt_p)
     
     # Ensure symmetry if required
     if sym_type == 'upper':
         A = torch.triu(A) + torch.triu(A, 1).T  # Ensure symmetry using upper triangular
     elif sym_type == 'lower':
         A = torch.tril(A) + torch.tril(A, -1).T  # Ensure symmetry using lower triangular
+
+    # Remove any self-loops that may remain
+    A.fill_diagonal_(0)
 
     # ========== Build Rewired Graph ==========
     g_rewired = g.clone().cpu()

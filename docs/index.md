@@ -45,12 +45,10 @@ This repository contains two main packages:
   - SBM-based graph rewiring to optimize network structure
   - Iterative rewiring with SGC-based predictions
   - Support for both homophilic and heterophilic settings
-  - Selective GNN models that choose the best graph structure for each node
 
 - **GNN Models**
   - Graph Convolutional Networks (GCN) with various configurations
   - High/Low-Pass graph convolution filter models
-  - Selective GNN models that can choose the best graph structure for each node
 
 - **Sensitivity Analysis**
   - Signal, noise, and global sensitivity estimation
