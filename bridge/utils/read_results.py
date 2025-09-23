@@ -142,7 +142,7 @@
 #         # The dict for this model
 #         md = models_data[model_name]
 #         print(md)
-#         # model_name = model_name.replace('High-Pass','Low-Pass')
+ 
         
 #         # For each dataset in MAIN_DATASETS, fetch the data.
 #         cora = md.get("cora", {})
@@ -292,21 +292,12 @@
 #     #           citeseer/results.json
 #     #           pubmed/results.json
 #     #           ...
-#     #       HighPassGCN/
+ 
 #     #           cora/results.json
 #     #           ...
 #     # or whichever structure you actually use.
     
-#     # Let's say we have two such folders: "experiments/BaseGCN" and "experiments/HighPassGCN"
-#     model_folders = [
-#         ('High-Pass GCN (dir)','rewiring_results/correct_normalisation_local_homophily_with_hp_no_self_loop_2025-02-28-14:25:36/asym'),
-#         ('High-Pass GCN (sym)','rewiring_results/correct_normalisation_local_homophily_with_hp_no_self_loop_2025-02-28-14:25:36/sym'),
-#         ('Low-Pass GCN (dir)','rewiring_results/correct_normalisation_local_homophily_no_hp_no_self_loop_old_code_2025-02-26-11:33:42/asym'),
-#         ('Low-Pass GCN (sym)','rewiring_results/correct_normalisation_local_homophily_no_hp_no_self_loop_old_code_2025-02-26-11:33:42/sym'),
-#         # ('High-Pass GCN','rewiring_results/synthetic_datasets_with_hp_2025-02-22-08:53:54/sym'),
-#         # ('Low-Pass GCN','rewiring_results/synthetic_graphs_corrected_d_no_hp_2025-02-20-13:31:54/sym')
-#         # Add as many as you want...
-#     ]
+ 
     
 #     # Parse results for each folder
 #     models_data = {}

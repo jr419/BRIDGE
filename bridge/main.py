@@ -48,7 +48,6 @@ def parse_args():
     parser.add_argument('--experiment_name', type=str, default=None, help='Name of the experiment')
     
     # Model settings
-    parser.add_argument('--do_hp', action='store_true', help='Use higher-order polynomial filters')
     parser.add_argument('--do_self_loop', action='store_true', help='Add self-loops to graphs')
     parser.add_argument('--do_residual', action='store_true', help='Use residual connections in MPNN')
     parser.add_argument('--early_stopping', type=int, default=50, help='Early stopping patience')
@@ -85,14 +84,7 @@ def parse_args():
                         help='Use iterative rewiring approach instead of single rewiring step')
     parser.add_argument('--n_rewire_iterations_range', nargs=2, type=int, default=[1, 20],
                       help='Range of rewiring iterations to try during optimization [min, max]')
-    parser.add_argument('--use_sgc', action='store_true',
-                        help='Use SGC for faster rewiring in iterative approach')
-    parser.add_argument('--sgc_K_options', type=int, default=[1, 2, 3],
-                        help='Number of propagation steps for SGC in iterative rewiring')
-    parser.add_argument('--sgc_wd_range', type=int, default=[1e-5, 0.1],
-                        help='Number of propagation steps for SGC in iterative rewiring')
-    parser.add_argument('--sgc_lr_range', type=int, default=[1e-5, 0.1],
-                        help='Number of propagation steps for SGC in iterative rewiring')
+    
     parser.add_argument('--simulated_acc', default=None, action='store_true',
                     help='Use simulated accuracy for iterative rewiring optimization')
     
@@ -306,12 +298,6 @@ def run_rewiring_experiment(args):
                     g = dgl.remove_self_loop(g)
                     g = dgl.add_self_loop(g)
                 
-                # Set HP mode based on dataset
-                do_hp = args.do_hp
-                if do_hp and dataset_name.lower() in ['cora', 'citeseer', 'pubmed']:
-                    do_hp = False
-                    print(f"Disabling HP mode for {dataset_name}")
-                
                 # Print dataset statistics
                 print(f"\nDataset Statistics:")
                 print(f"Number of nodes: {g.num_nodes()}")
@@ -322,17 +308,11 @@ def run_rewiring_experiment(args):
                 print(f"Number of features: {g.ndata['feat'].shape[1]}")
                 print(f"Number of classes: {len(torch.unique(g.ndata['label']))}")
                 print(f"Model type: {args.model_type}")
-                print(f"HP mode: {do_hp}")
                 print(f"Self-loops: {args.do_self_loop}")
                 print(f"Residual connections: {args.do_residual}")
                 print(f"Using iterative rewiring: {args.use_iterative_rewiring}")
                 if args.use_iterative_rewiring:
                     print(f"  - Rewiring iterations: {args.n_rewire_iterations_range}")
-                    print(f"  - Using SGC: {args.use_sgc}")
-                    if args.use_sgc:
-                        print(f"  - SGC propagation steps: {args.sgc_K_options}")
-                        print(f"  - SGC weight decay: {args.sgc_wd_range}")
-                        print(f"  - SGC learning rate: {args.sgc_lr_range}")
                     print(f'  - Simulated accuracy: {args.simulated_acc}')
                 
                 # Create dataset-specific study names
@@ -362,7 +342,6 @@ def run_rewiring_experiment(args):
                         n_epochs=1000,
                         num_splits=args.num_splits,
                         early_stopping=args.early_stopping,
-                        do_hp=do_hp,
                         do_residual_connections=args.do_residual,
                         dataset_name=dataset_name,
                         model_type=args.model_type,
@@ -410,7 +389,6 @@ def run_rewiring_experiment(args):
                             num_splits=args.num_splits,
                             early_stopping=args.early_stopping,
                             model_type=args.model_type,
-                            do_hp=do_hp,
                             do_self_loop=args.do_self_loop,
                             do_residual_connections=args.do_residual,
                             dataset_name=dataset_name,
@@ -435,7 +413,6 @@ def run_rewiring_experiment(args):
                             n_epochs=1000,
                             num_splits=args.num_splits,
                             early_stopping=args.early_stopping,
-                            do_hp=do_hp,
                             do_self_loop=args.do_self_loop,
                             do_residual_connections=args.do_residual,
                             dataset_name=dataset_name
@@ -511,10 +488,7 @@ def run_rewiring_experiment(args):
                 model_lr_mpnn = best_mpnn_params.get('model_lr', best_mpnn_attributes.get('model_lr'))#['model_lr']
                 wd_mpnn = best_mpnn_params.get('weight_decay', best_mpnn_attributes.get('weight_decay'))#['weight_decay']
                 
-                if args.use_iterative_rewiring:
-                    sgc_K = best_rewiring_params.get('sgc_K', best_rewiring_attributes.get('sgc_K'))
-                    sgc_wd = best_rewiring_params.get('sgc_wd', best_rewiring_attributes.get('sgc_wd'))
-                    sgc_lr = best_rewiring_params.get('sgc_lr', best_rewiring_attributes.get('sgc_lr'))
+                
                 
                 if args.rewiring_method == 'sdrf':
                     sdrf_tau = best_rewiring_params.get('sdrf_tau', best_rewiring_attributes.get('sdrf_tau'))
@@ -556,7 +530,6 @@ def run_rewiring_experiment(args):
                     device=device,
                     num_splits=args.num_splits,
                     log_training=False,
-                    do_hp=do_hp,
                     do_self_loop=args.do_self_loop,
                     do_residual_connections=args.do_residual,
                     dataset_name=dataset_name,
@@ -583,14 +556,9 @@ def run_rewiring_experiment(args):
                         early_stopping=args.early_stopping,
                         log_training=False,
                         dataset_name=dataset_name,
-                        do_hp=do_hp,
                         do_self_loop=args.do_self_loop,
                         do_residual_connections=args.do_residual,
-                        use_sgc=args.use_sgc,
                         n_rewire=n_rewire_iterations,
-                        sgc_K=sgc_K,
-                        sgc_wd=sgc_wd,
-                        sgc_lr=sgc_lr,
                         rewiring_method=args.rewiring_method,
                         tau=sdrf_tau,
                         sdrf_iterations=sdrf_iterations,
@@ -621,7 +589,6 @@ def run_rewiring_experiment(args):
                         early_stopping=args.early_stopping,
                         log_training=False,
                         dataset_name=dataset_name,
-                        do_hp=do_hp,
                         do_self_loop=args.do_self_loop,
                         do_residual_connections=args.do_residual
                     )

@@ -88,7 +88,6 @@ def class_bottlenecking_score(
     g: dgl.DGLGraph, 
     y: Optional[torch.Tensor] = None,
     self_loops: bool = False,
-    do_hp: bool = False,
     fix_d: bool = True, 
     sym: bool = False, 
     device: Union[str, torch.device] = 'cpu'
@@ -104,7 +103,6 @@ def class_bottlenecking_score(
         g: Input graph
         y: Node labels of shape (n_nodes,), if None will use g.ndata['label']
         self_loops: Whether to include self-loops in adjacency
-        do_hp: Whether to compute higher-order polynomial version (I - A)
         fix_d: If True, row-normalize adjacency (D^{-1}A)
         sym: Whether to symmetrize adjacency (A <- A + A^T)
         device: Device to perform computation on
@@ -125,15 +123,7 @@ def class_bottlenecking_score(
     # 2) Normalize adjacency
     A = normalize_sparse_adj(A)
 
-    if do_hp:
-        # Create sparse identity matrix
-        I = torch.sparse_coo_tensor(
-            indices=torch.arange(A.size(0)).repeat(2, 1),
-            values=torch.ones(A.size(0)),
-            size=A.size()
-        )
-        # Low pass filter: I - A
-        A = I - A
+    # Always use normalized adjacency
 
     # 3) Build label matrix M
     if len(y.shape) == 1:
@@ -154,7 +144,6 @@ def self_bottlenecking_score(
     p: int,
     g: dgl.DGLGraph,
     self_loops: bool = False,
-    do_hp: bool = False,
     fix_d: bool = True,
     sym: bool = False,
     device: Union[str, torch.device] = 'cpu'
@@ -169,7 +158,6 @@ def self_bottlenecking_score(
         p: The order for the self bottlenecking score
         g: Input graph
         self_loops: Whether to include self-loops in the adjacency matrix
-        do_hp : Whether to compute higher-order polynomial version (I - A)
         fix_d: Whether to fix the degree distribution by normalizing
         sym: Whether to symmetrize the adjacency matrix
         device: Device to perform computations on
@@ -185,15 +173,7 @@ def self_bottlenecking_score(
     # 2) Normalize adjacency
     A = normalize_sparse_adj(A)
 
-    if do_hp:
-        # Create sparse identity matrix
-        I = torch.sparse_coo_tensor(
-            indices=torch.arange(A.size(0)).repeat(2, 1),
-            values=torch.ones(A.size(0)),
-            size=A.size()
-        )
-        # Low pass filter: I - A
-        A = I - A
+    # Always use normalized adjacency
 
     # 3) Build label matrix M
     M = torch.eye(A.size(0), device=device)  # Identity matrix for self-connectivity
@@ -211,7 +191,6 @@ def total_bottlenecking_score(
     p: int,
     g: dgl.DGLGraph,
     self_loops: bool = False,
-    do_hp: bool = False,
     fix_d: bool = True,
     sym: bool = False,
     device: Union[str, torch.device] = 'cpu'
@@ -226,7 +205,6 @@ def total_bottlenecking_score(
         p: The order for the total bottlenecking score
         g: Input graph
         self_loops: Whether to include self-loops in the adjacency matrix
-        do_hp: Whether to compute higher-order polynomial version (I - A)
         fix_d: Whether to fix the degree distribution by normalizing
         sym: Whether to symmetrize the adjacency matrix
         device: Device to perform computations on
@@ -242,15 +220,7 @@ def total_bottlenecking_score(
     # 2) Normalize adjacency
     A = normalize_sparse_adj(A)
 
-    if do_hp:
-        # Create sparse identity matrix
-        I = torch.sparse_coo_tensor(
-            indices=torch.arange(A.size(0)).repeat(2, 1),
-            values=torch.ones(A.size(0)),
-            size=A.size()
-        )
-        # Low pass filter: I - A
-        A = I - A
+    # Always use normalized adjacency
 
     # 3) Build label matrix M
     M = torch.eye(A.size(0), device=device)  # Identity matrix for total bottlenecking

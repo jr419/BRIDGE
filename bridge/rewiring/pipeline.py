@@ -15,7 +15,7 @@ from tqdm import trange
 from typing import Tuple, List, Dict, Union, Optional, Any
 import copy
 
-from ..models import GCN, SGC
+from ..models import GCN
 from ..training import train, get_metric_type
 from ..utils import (
     set_seed, check_symmetry,
@@ -34,7 +34,6 @@ def create_model(
     n_layers: int,
     dropout_p: float,
     do_residual_connections: bool = False,
-    do_hp: bool = False,
     device: str = 'cpu'
 ):
     model_type = model_type.upper()
@@ -45,11 +44,10 @@ def create_model(
             out_feats,
             n_layers,
             dropout_p,
-            residual_connection=do_residual_connections,
-            do_hp=do_hp
+            residual_connection=do_residual_connections
         ).to(device)
         return model
-    # SGC can be supported via explicit construction elsewhere if needed
+    # Only standard GCN is supported in the pipeline
     raise ValueError(f"Unsupported model type: {model_type}. Only 'GCN' is supported in the standard pipeline.")
 
 
@@ -72,7 +70,6 @@ def run_bridge_pipeline(
     val_mask: Optional[torch.Tensor] = None,
     test_mask: Optional[torch.Tensor] = None,
     dataset_name: str = 'unknown',
-    do_hp: bool = False,
     do_self_loop: bool = False,
     do_residual_connections: bool = False
 ) -> Dict[str, Any]:
@@ -110,7 +107,7 @@ def run_bridge_pipeline(
         num_nodes = graph.num_nodes()
         num_edges = graph.num_edges()
         mean_degree = graph.in_degrees().float().mean().item()
-        mean_class_bottlenecking_score = class_bottlenecking_score(n_layers_mpnn+1, graph, do_hp=do_hp).mean().item()
+        mean_class_bottlenecking_score = class_bottlenecking_score(n_layers_mpnn+1, graph).mean().item()
         stats = {
             'num_nodes': num_nodes,
             'num_edges': num_edges,
@@ -131,7 +128,7 @@ def run_bridge_pipeline(
     
     model_cold = GCN(
         in_feats, h_feats_mpnn, out_feats, n_layers_mpnn,
-        dropout_p_mpnn, residual_connection=do_residual_connections, do_hp=do_hp
+        dropout_p_mpnn, residual_connection=do_residual_connections
     ).to(device)
     
     train_acc_cold, val_acc_cold, test_acc_cold, model_cold = train(
@@ -218,7 +215,7 @@ def run_bridge_pipeline(
     ########################################################################
     model_rw = GCN(
         in_feats, h_feats_mpnn, out_feats, n_layers_mpnn,
-        dropout_p_mpnn, residual_connection=do_residual_connections, do_hp=do_hp
+        dropout_p_mpnn, residual_connection=do_residual_connections
     ).to(device)
 
     train_acc_rw, val_acc_rw, test_acc_rw, model_rw = train(
@@ -268,7 +265,6 @@ def run_bridge_experiment(
     num_splits: int = 100,
     log_training: bool = False,
     dataset_name: str = 'unknown',
-    do_hp: bool = False,
     do_self_loop: bool = False,
     do_residual_connections: bool = False
 ) -> Tuple[Dict[str, Any], List[Dict[str, Any]]]:
@@ -328,7 +324,6 @@ def run_bridge_experiment(
             val_mask=current_val_mask,
             test_mask=current_test_mask,
             dataset_name=dataset_name,
-            do_hp=do_hp,
             do_self_loop=do_self_loop,
             do_residual_connections=do_residual_connections
         )
@@ -424,14 +419,9 @@ def run_iterative_bridge_pipeline(
     val_mask: Optional[torch.Tensor] = None,
     test_mask: Optional[torch.Tensor] = None,
     dataset_name: str = 'unknown',
-    do_hp: bool = False,
     do_self_loop: bool = False,
     do_residual_connections: bool = False,
-    use_sgc: bool = True,
     n_rewire: int = 10,
-    sgc_K: int = 2,
-    sgc_lr: float = 1e-2,
-    sgc_wd: float = 1e-4,
     rewiring_method: str = "bridge",
     tau: float = 0.1,
     sdrf_iterations: int = 1,
@@ -468,7 +458,7 @@ def run_iterative_bridge_pipeline(
         num_nodes = graph.num_nodes()
         num_edges = graph.num_edges()
         mean_degree = graph.in_degrees().float().mean().item()
-        mean_class_bottlenecking_score = class_bottlenecking_score(l, graph, do_hp=do_hp).mean().item()
+        mean_class_bottlenecking_score = class_bottlenecking_score(l, graph).mean().item()
         stats = {
             'num_nodes': num_nodes,
             'num_edges': num_edges,
@@ -510,7 +500,6 @@ def run_iterative_bridge_pipeline(
         n_layers=n_layers_mpnn,
         dropout_p=dropout_p_mpnn,
         do_residual_connections=do_residual_connections,
-        do_hp=do_hp,
         device=device
     )
 
@@ -604,7 +593,6 @@ def run_iterative_bridge_pipeline(
         n_layers=n_layers_mpnn,
         dropout_p=dropout_p_mpnn,
         do_residual_connections=do_residual_connections,
-        do_hp=do_hp,
         device=device
     )
 
@@ -658,14 +646,9 @@ def run_iterative_bridge_experiment(
     num_repeats: int = 10,
     log_training: bool = False,
     dataset_name: str = 'unknown',
-    do_hp: bool = False,
     do_self_loop: bool = False,
     do_residual_connections: bool = False,
-    use_sgc: bool = True,
     n_rewire: int = 10,
-    sgc_K: int = 2,
-    sgc_lr: float = 1e-2,
-    sgc_wd: float = 1e-4,
     rewiring_method: str = "bridge",
     tau: float = 0.1,
     sdrf_iterations: int = 1,
@@ -731,14 +714,9 @@ def run_iterative_bridge_experiment(
             val_mask=current_val_mask,
             test_mask=current_test_mask,
             dataset_name=dataset_name,
-            do_hp=do_hp,
             do_self_loop=do_self_loop,
             do_residual_connections=do_residual_connections,
-            use_sgc=use_sgc,
             n_rewire=n_rewire,
-            sgc_K=sgc_K,
-            sgc_lr=sgc_lr,
-            sgc_wd=sgc_wd,
             rewiring_method=rewiring_method,
             tau=tau,
             sdrf_iterations=sdrf_iterations,

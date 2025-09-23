@@ -85,7 +85,6 @@ def train_and_evaluate_mpnn(
     num_splits: int = 100,
     log_training: bool = False,
     model_type: str = 'GCN',
-    do_hp: bool = False,
     do_self_loop: bool = False,
     do_residual_connections: bool = False,
     dataset_name: str = 'unknown'
@@ -106,7 +105,6 @@ def train_and_evaluate_mpnn(
         num_splits: Number of times to repeat the experiment
         log_training: Whether to print training progress
         model_type: Type of model to use (default: 'GCN')
-        do_hp: Whether to use higher-order polynomial filters
         do_self_loop: Whether to add self-loops
         do_residual_connections: Whether to use residual connections
         dataset_name: Name of the dataset
@@ -160,8 +158,7 @@ def train_and_evaluate_mpnn(
             out_feats,
             n_layers,
             dropout_p,
-            residual_connection=do_residual_connections,
-            do_hp=do_hp
+            residual_connection=do_residual_connections
         )
         model = model.to(device)
         
@@ -222,7 +219,6 @@ def objective_mpnn(
     num_splits: int = 100,
     early_stopping: int = 50,
     model_type: str = 'GCN',
-    do_hp: bool = False,
     do_residual_connections: bool = False,
     dataset_name: str = 'unknown',
     h_feats_options: List[int] = None,
@@ -242,7 +238,6 @@ def objective_mpnn(
         num_splits: Number of splits/repetitions for statistical significance
         early_stopping: Number of epochs to look back for early stopping
         model_type: Type of model to use (default: 'mpnn')
-        do_hp: Whether to use higher-order polynomial filters
         do_residual_connections: Whether to use residual connections
         dataset_name: Name of the dataset
         h_feats_options: List of hidden feature dimensions to try (default: [16, 32, 64, 128])
@@ -317,7 +312,6 @@ def objective_mpnn(
         n_epochs=n_epochs,
         early_stopping=early_stopping,
         model_type=model_type,
-        do_hp=do_hp,
         do_residual_connections=do_residual_connections,
         dataset_name=dataset_name,
         **params
@@ -385,7 +379,6 @@ def objective_rewiring(
     num_splits: int = 100,
     early_stopping: int = 50,
     model_type: str = 'GCN',
-    do_hp: bool = False,
     do_self_loop: bool = False,
     do_residual_connections: bool = False,
     dataset_name: str = 'unknown'
@@ -424,8 +417,7 @@ def objective_rewiring(
         n_epochs=n_epochs,
         early_stopping=early_stopping,
         log_training=False,
-        dataset_name=dataset_name,
-        do_hp=do_hp,
+        dataset_name=dataset_name
         do_self_loop=do_self_loop,
         do_residual_connections=do_residual_connections,
         **params_mpnn,
@@ -467,15 +459,11 @@ def objective_iterative_rewiring(
     num_splits: int = 100,
     early_stopping: int = 50,
     model_type: str = 'GCN',
-    do_hp: bool = False,
     do_self_loop: bool = False,
     do_residual_connections: bool = False,
     dataset_name: str = 'unknown',
     n_rewire_iterations_range: List[int] = None,
-    use_sgc: bool = True,
-    sgc_K_options: List[int] = None,
-    sgc_lr_range: List[float] = None,
-    sgc_wd_range: List[float] = None,
+    
     rewiring_method: str = "bridge",
     sdrf_tau_range: list = [0.01, 300],
     sdrf_n_iterations_range: list = [1, 300],
@@ -492,9 +480,6 @@ def objective_iterative_rewiring(
     Rewiring uses full resampling with hard predictions.
     """
     # Defaults
-    sgc_K_options = sgc_K_options or [1, 2, 3, 4]
-    sgc_lr_range = sgc_lr_range or [1e-3, 1e-1]
-    sgc_wd_range = sgc_wd_range or [1e-5, 1e-3]
     n_rewire_iterations_range = n_rewire_iterations_range or [1, 20]
 
     # Hyperparameters
@@ -524,10 +509,7 @@ def objective_iterative_rewiring(
         'wd_mpnn': best_mpnn_params.get('weight_decay', 1e-5),
     }
 
-    # SGC params
-    sgc_K = trial_suggest_or_fixed(trial, sgc_K_options, 'sgc_K', param_type="categorical")
-    sgc_lr = trial_suggest_or_fixed(trial, sgc_lr_range, 'sgc_lr', param_type="float", log_scale=True)
-    sgc_wd = trial_suggest_or_fixed(trial, sgc_wd_range, 'sgc_wd', param_type="float", log_scale=True)
+    
 
     tau = trial_suggest_or_fixed(trial, sdrf_tau_range, 'sdrf_tau', param_type="float")
     sdrf_iterations = trial_suggest_or_fixed(trial, sdrf_n_iterations_range, 'sdrf_iterations', param_type="int")
@@ -551,14 +533,9 @@ def objective_iterative_rewiring(
         early_stopping=early_stopping,
         log_training=False,
         dataset_name=dataset_name,
-        do_hp=do_hp,
         do_self_loop=do_self_loop,
         do_residual_connections=do_residual_connections,
-        use_sgc=use_sgc,
         n_rewire=n_rewire,
-        sgc_K=sgc_K,
-        sgc_lr=sgc_lr,
-        sgc_wd=sgc_wd,
         rewiring_method=rewiring_method,
         tau=tau,
         sdrf_iterations=sdrf_iterations,
@@ -597,10 +574,6 @@ def objective_iterative_rewiring(
 
     # Store iterative rewiring specific information
     trial.set_user_attr('n_rewire_iterations', n_rewire)
-    trial.set_user_attr('use_sgc', use_sgc)
-    trial.set_user_attr('sgc_K', sgc_K)
-    trial.set_user_attr('sgc_lr', sgc_lr)
-    trial.set_user_attr('sgc_wd', sgc_wd)
 
     trial.set_user_attr('sdrf_tau', tau)
     trial.set_user_attr('sdrf_iterations', sdrf_iterations)
