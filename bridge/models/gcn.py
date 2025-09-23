@@ -27,7 +27,6 @@ class GCN(nn.Module):
         dropout_p: Dropout probability
         activation: Activation function to use (default: F.relu)
         bias: Whether to use bias in GraphConv layers
-        residual_connection: Unused placeholder for potential residual connections
     """
     def __init__(
         self, 
@@ -37,8 +36,7 @@ class GCN(nn.Module):
         n_layers: int, 
         dropout_p: float, 
         activation: Callable = F.relu, 
-        bias: bool = True, 
-        residual_connection: bool = False
+        bias: bool = True
     ):
         super(GCN, self).__init__()
         self.layers = nn.ModuleList()

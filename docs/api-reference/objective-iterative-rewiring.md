@@ -22,7 +22,6 @@ objective_iterative_rewiring(
     early_stopping: int = 50,
     model_type: str = 'GCN',
     do_self_loop: bool = False,
-    do_residual_connections: bool = False,
     dataset_name: str = 'unknown',
     n_rewire_iterations_range: List[int] = None,
     rewiring_method: str = "bridge",

@@ -22,7 +22,6 @@ objective_rewiring(
     early_stopping: int = 50,
     model_type: str = 'GCN',
     do_self_loop: bool = False,
-    do_residual_connections: bool = False,
     dataset_name: str = 'unknown'
 ) -> float
 ```

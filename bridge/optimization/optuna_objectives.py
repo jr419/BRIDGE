@@ -86,7 +86,6 @@ def train_and_evaluate_mpnn(
     log_training: bool = False,
     model_type: str = 'GCN',
     do_self_loop: bool = False,
-    do_residual_connections: bool = False,
     dataset_name: str = 'unknown'
 ) -> Tuple[float, float, float, Tuple[float, float], Tuple[float, float], Tuple[float, float]]:
     """
@@ -106,7 +105,6 @@ def train_and_evaluate_mpnn(
         log_training: Whether to print training progress
         model_type: Type of model to use (default: 'GCN')
         do_self_loop: Whether to add self-loops
-        do_residual_connections: Whether to use residual connections
         dataset_name: Name of the dataset
         
     Returns:
@@ -157,8 +155,7 @@ def train_and_evaluate_mpnn(
             h_feats,
             out_feats,
             n_layers,
-            dropout_p,
-            residual_connection=do_residual_connections
+            dropout_p
         )
         model = model.to(device)
         
@@ -219,7 +216,6 @@ def objective_mpnn(
     num_splits: int = 100,
     early_stopping: int = 50,
     model_type: str = 'GCN',
-    do_residual_connections: bool = False,
     dataset_name: str = 'unknown',
     h_feats_options: List[int] = None,
     n_layers_options: List[int] = None,
@@ -238,7 +234,6 @@ def objective_mpnn(
         num_splits: Number of splits/repetitions for statistical significance
         early_stopping: Number of epochs to look back for early stopping
         model_type: Type of model to use (default: 'mpnn')
-        do_residual_connections: Whether to use residual connections
         dataset_name: Name of the dataset
         h_feats_options: List of hidden feature dimensions to try (default: [16, 32, 64, 128])
         n_layers_options: List of layer counts to try (default: [1, 2, 3])
@@ -312,7 +307,6 @@ def objective_mpnn(
         n_epochs=n_epochs,
         early_stopping=early_stopping,
         model_type=model_type,
-        do_residual_connections=do_residual_connections,
         dataset_name=dataset_name,
         **params
     )
@@ -380,7 +374,6 @@ def objective_rewiring(
     early_stopping: int = 50,
     model_type: str = 'GCN',
     do_self_loop: bool = False,
-    do_residual_connections: bool = False,
     dataset_name: str = 'unknown'
 ) -> float:
     """
@@ -417,9 +410,8 @@ def objective_rewiring(
         n_epochs=n_epochs,
         early_stopping=early_stopping,
         log_training=False,
-        dataset_name=dataset_name
+        dataset_name=dataset_name,
         do_self_loop=do_self_loop,
-        do_residual_connections=do_residual_connections,
         **params_mpnn,
     )
 
@@ -460,7 +452,6 @@ def objective_iterative_rewiring(
     early_stopping: int = 50,
     model_type: str = 'GCN',
     do_self_loop: bool = False,
-    do_residual_connections: bool = False,
     dataset_name: str = 'unknown',
     n_rewire_iterations_range: List[int] = None,
     
@@ -534,7 +525,6 @@ def objective_iterative_rewiring(
         log_training=False,
         dataset_name=dataset_name,
         do_self_loop=do_self_loop,
-        do_residual_connections=do_residual_connections,
         n_rewire=n_rewire,
         rewiring_method=rewiring_method,
         tau=tau,

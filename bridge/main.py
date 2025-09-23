@@ -49,7 +49,7 @@ def parse_args():
     
     # Model settings
     parser.add_argument('--do_self_loop', action='store_true', help='Add self-loops to graphs')
-    parser.add_argument('--do_residual', action='store_true', help='Use residual connections in MPNN')
+    # Removed: residual connections option
     parser.add_argument('--early_stopping', type=int, default=50, help='Early stopping patience')
     
     # Dataset settings
@@ -309,7 +309,7 @@ def run_rewiring_experiment(args):
                 print(f"Number of classes: {len(torch.unique(g.ndata['label']))}")
                 print(f"Model type: {args.model_type}")
                 print(f"Self-loops: {args.do_self_loop}")
-                print(f"Residual connections: {args.do_residual}")
+                pass
                 print(f"Using iterative rewiring: {args.use_iterative_rewiring}")
                 if args.use_iterative_rewiring:
                     print(f"  - Rewiring iterations: {args.n_rewire_iterations_range}")
@@ -342,7 +342,7 @@ def run_rewiring_experiment(args):
                         n_epochs=1000,
                         num_splits=args.num_splits,
                         early_stopping=args.early_stopping,
-                        do_residual_connections=args.do_residual,
+                        
                         dataset_name=dataset_name,
                         model_type=args.model_type,
                         h_feats_options=args.mpnn_h_feats,
@@ -390,7 +390,7 @@ def run_rewiring_experiment(args):
                             early_stopping=args.early_stopping,
                             model_type=args.model_type,
                             do_self_loop=args.do_self_loop,
-                            do_residual_connections=args.do_residual,
+                            
                             dataset_name=dataset_name,
                             rewiring_method=args.rewiring_method,
                             sdrf_tau_range=args.sdrf_tau_range,
@@ -414,7 +414,7 @@ def run_rewiring_experiment(args):
                             num_splits=args.num_splits,
                             early_stopping=args.early_stopping,
                             do_self_loop=args.do_self_loop,
-                            do_residual_connections=args.do_residual,
+                            
                             dataset_name=dataset_name
                         )
                 
@@ -531,7 +531,7 @@ def run_rewiring_experiment(args):
                     num_splits=args.num_splits,
                     log_training=False,
                     do_self_loop=args.do_self_loop,
-                    do_residual_connections=args.do_residual,
+                    
                     dataset_name=dataset_name,
                     )
 
@@ -557,7 +557,7 @@ def run_rewiring_experiment(args):
                         log_training=False,
                         dataset_name=dataset_name,
                         do_self_loop=args.do_self_loop,
-                        do_residual_connections=args.do_residual,
+                        
                         n_rewire=n_rewire_iterations,
                         rewiring_method=args.rewiring_method,
                         tau=sdrf_tau,
@@ -590,7 +590,7 @@ def run_rewiring_experiment(args):
                         log_training=False,
                         dataset_name=dataset_name,
                         do_self_loop=args.do_self_loop,
-                        do_residual_connections=args.do_residual
+                        
                     )
                 
                 # Calculate improvement

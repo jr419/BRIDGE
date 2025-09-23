@@ -86,7 +86,6 @@ Command-line arguments take precedence over options in the configuration file.
 
 ```bash
 --do_self_loop                  Add self-loops to graphs
---do_residual                   Use residual connections in the base model
 --early_stopping INTEGER        Early stopping patience
 ```
 

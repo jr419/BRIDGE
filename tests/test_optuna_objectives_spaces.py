@@ -51,7 +51,6 @@ def test_objective_callable_smoke(monkeypatch):
             early_stopping=1,
             do_hp=False,
             do_self_loop=False,
-            do_residual_connections=False,
             dataset_name='cora'
         )
     except Exception as e:
@@ -69,7 +68,6 @@ def test_objective_callable_smoke(monkeypatch):
             early_stopping=1,
             do_hp=False,
             do_self_loop=False,
-            do_residual_connections=False,
             dataset_name='cora',
             rewiring_method='bridge',
             n_rewire_iterations_range=[1, 1]

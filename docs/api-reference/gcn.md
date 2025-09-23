@@ -17,7 +17,7 @@ parent: API Reference
 
 ## Overview
 
-The `GCN` class implements a Graph Convolutional Network as described in [Kipf & Welling (2017)](https://arxiv.org/abs/1609.02907). This implementation supports variable depth and optional residual connections.
+The `GCN` class implements a Graph Convolutional Network as described in [Kipf & Welling (2017)](https://arxiv.org/abs/1609.02907). This implementation supports variable depth and dropout.
 
 ## Class Definition
 
@@ -31,8 +31,7 @@ class GCN(nn.Module):
         n_layers: int, 
         dropout_p: float, 
         activation: Callable = F.relu, 
-        bias: bool = True, 
-        residual_connection: bool = False
+        bias: bool = True
     ):
         # Implementation details...
         
@@ -53,7 +52,6 @@ class GCN(nn.Module):
 | `dropout_p` | float | Dropout probability |
 | `activation` | Callable | Activation function to use (default: F.relu) |
 | `bias` | bool | Whether to use bias in GraphConv layers |
-| `residual_connection` | bool | Whether to use residual connections |
 
 ### Forward Method Parameters
 
@@ -96,22 +94,7 @@ print(output.shape)  # Should be (3, 2)
 ```
 
 
-### With Residual Connections
-
-```python
-# Create a GCN model with residual connections
-residual_model = GCN(
-    in_feats=5,
-    h_feats=16,
-    out_feats=2,
-    n_layers=3,
-    dropout_p=0.5,
-    residual_connection=True  # Use residual connections
-)
-
-# Forward pass
-output = residual_model(g, g.ndata['feat'])
-```
+ 
 
 ## Implementation Details
 

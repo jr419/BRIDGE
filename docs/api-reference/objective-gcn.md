@@ -28,7 +28,6 @@ def objective_gcn(
     device: Union[str, torch.device] = 'cpu',
     n_epochs: int = 1000,
     early_stopping: int = 50,
-    do_residual_connections: bool = False,
     dataset_name: str = 'unknown',
     h_feats_options: List[int] = None,
     n_layers_options: List[int] = None,
@@ -47,7 +46,6 @@ def objective_gcn(
 | `device` | Union[str, torch.device] | Device to perform computations on |
 | `n_epochs` | int | Maximum number of training epochs |
 | `early_stopping` | int | Number of epochs to look back for early stopping |
-| `do_residual_connections` | bool | Whether to use residual connections |
 | `dataset_name` | str | Name of the dataset |
 | `h_feats_options` | List[int] | List of hidden feature dimensions to try (default: [16, 32, 64, 128]) |
 | `n_layers_options` | List[int] | List of layer counts to try (default: [1, 2, 3]) |
@@ -129,7 +127,6 @@ def objective(trial):
         device='cuda' if torch.cuda.is_available() else 'cpu',
         n_epochs=200,
         early_stopping=30,
-        do_residual_connections=False,
         dataset_name='cora'
     )
 
@@ -166,7 +163,6 @@ def objective(trial):
         device='cuda' if torch.cuda.is_available() else 'cpu',
         n_epochs=200,
         early_stopping=30,
-        do_residual_connections=True,  # Use residual connections
         dataset_name='citeseer',
         h_feats_options=h_feats_options,
         n_layers_options=n_layers_options,
@@ -198,7 +194,6 @@ def gcn_objective(trial):
         device=device,
         n_epochs=1000,
         early_stopping=args.early_stopping,
-        do_residual_connections=args.do_residual,
         dataset_name=dataset_name,
         h_feats_options=args.gcn_h_feats,
         n_layers_options=args.gcn_n_layers,
@@ -253,7 +248,6 @@ def train_and_evaluate_gcn(
     device: Union[str, torch.device] = 'cpu',
     num_repeats: int = 10,
     log_training: bool = False,
-    do_residual_connections: bool = False,
     dataset_name: str = 'unknown'
 ) -> Tuple[float, float, float, Tuple[float, float], Tuple[float, float], Tuple[float, float]]
 ```

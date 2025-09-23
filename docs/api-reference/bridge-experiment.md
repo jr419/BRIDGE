@@ -38,8 +38,7 @@ def run_bridge_experiment(
     num_splits: int = 10,
     log_training: bool = False,
     dataset_name: str = 'unknown',
-    do_self_loop: bool = False,
-    do_residual_connections: bool = False
+    do_self_loop: bool = False
 ) -> Tuple[Dict[str, Any], List[Dict[str, Any]]]
 ```
 
@@ -63,7 +62,6 @@ def run_bridge_experiment(
 | `log_training` | bool | Whether to print training progress |
 | `dataset_name` | str | Name of the dataset |
 | `do_self_loop` | bool | Whether to add self-loops |
-| `do_residual_connections` | bool | Whether to use residual connections |
 
 ## Returns
 

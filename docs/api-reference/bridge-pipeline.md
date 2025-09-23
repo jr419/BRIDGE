@@ -43,8 +43,7 @@ def run_bridge_pipeline(
     val_mask: Optional[torch.Tensor] = None,
     test_mask: Optional[torch.Tensor] = None,
     dataset_name: str = 'unknown',
-    do_self_loop: bool = False,
-    do_residual_connections: bool = False
+    do_self_loop: bool = False
 ) -> Dict[str, Any]
 ```
 
@@ -71,7 +70,6 @@ def run_bridge_pipeline(
 | `test_mask` | Optional[torch.Tensor] | Boolean mask indicating test nodes |
 | `dataset_name` | str | Name of the dataset |
 | `do_self_loop` | bool | Whether to add self-loops |
-| `do_residual_connections` | bool | Whether to use residual connections |
 
 ## Returns
 

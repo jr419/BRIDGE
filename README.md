@@ -176,7 +176,6 @@ bridge --config config_examples/real_datasets_test.yaml
 ### Key Parameters
 
 - `do_self_loop`: Add self-loops to graph nodes
-- `do_residual_connections`: Use residual connections in GCN layers
 - `p_add`: Probability of adding new edges during rewiring
 - `p_remove`: Probability of removing existing edges during rewiring
 - `temperature`: Temperature for softmax when computing class probabilities

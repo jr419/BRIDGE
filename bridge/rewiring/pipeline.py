@@ -33,7 +33,6 @@ def create_model(
     out_feats: int,
     n_layers: int,
     dropout_p: float,
-    do_residual_connections: bool = False,
     device: str = 'cpu'
 ):
     model_type = model_type.upper()
@@ -43,8 +42,7 @@ def create_model(
             h_feats,
             out_feats,
             n_layers,
-            dropout_p,
-            residual_connection=do_residual_connections
+            dropout_p
         ).to(device)
         return model
     # Only standard GCN is supported in the pipeline
@@ -71,7 +69,7 @@ def run_bridge_pipeline(
     test_mask: Optional[torch.Tensor] = None,
     dataset_name: str = 'unknown',
     do_self_loop: bool = False,
-    do_residual_connections: bool = False
+    
 ) -> Dict[str, Any]:
     """
     Run the BRIDGE (Block Rewiring from Inference-Derived Graph Ensembles) pipeline.
@@ -128,7 +126,7 @@ def run_bridge_pipeline(
     
     model_cold = GCN(
         in_feats, h_feats_mpnn, out_feats, n_layers_mpnn,
-        dropout_p_mpnn, residual_connection=do_residual_connections
+        dropout_p_mpnn
     ).to(device)
     
     train_acc_cold, val_acc_cold, test_acc_cold, model_cold = train(
@@ -215,7 +213,7 @@ def run_bridge_pipeline(
     ########################################################################
     model_rw = GCN(
         in_feats, h_feats_mpnn, out_feats, n_layers_mpnn,
-        dropout_p_mpnn, residual_connection=do_residual_connections
+        dropout_p_mpnn
     ).to(device)
 
     train_acc_rw, val_acc_rw, test_acc_rw, model_rw = train(
@@ -265,8 +263,7 @@ def run_bridge_experiment(
     num_splits: int = 100,
     log_training: bool = False,
     dataset_name: str = 'unknown',
-    do_self_loop: bool = False,
-    do_residual_connections: bool = False
+    do_self_loop: bool = False
 ) -> Tuple[Dict[str, Any], List[Dict[str, Any]]]:
     """
     Run the rewiring pipeline multiple times and average the results.
@@ -324,8 +321,7 @@ def run_bridge_experiment(
             val_mask=current_val_mask,
             test_mask=current_test_mask,
             dataset_name=dataset_name,
-            do_self_loop=do_self_loop,
-            do_residual_connections=do_residual_connections
+            do_self_loop=do_self_loop
         )
         
         # Store results and statistics
@@ -420,7 +416,6 @@ def run_iterative_bridge_pipeline(
     test_mask: Optional[torch.Tensor] = None,
     dataset_name: str = 'unknown',
     do_self_loop: bool = False,
-    do_residual_connections: bool = False,
     n_rewire: int = 10,
     rewiring_method: str = "bridge",
     tau: float = 0.1,
@@ -499,7 +494,6 @@ def run_iterative_bridge_pipeline(
         out_feats=out_feats,
         n_layers=n_layers_mpnn,
         dropout_p=dropout_p_mpnn,
-        do_residual_connections=do_residual_connections,
         device=device
     )
 
@@ -592,7 +586,6 @@ def run_iterative_bridge_pipeline(
         out_feats=out_feats,
         n_layers=n_layers_mpnn,
         dropout_p=dropout_p_mpnn,
-        do_residual_connections=do_residual_connections,
         device=device
     )
 
@@ -647,7 +640,6 @@ def run_iterative_bridge_experiment(
     log_training: bool = False,
     dataset_name: str = 'unknown',
     do_self_loop: bool = False,
-    do_residual_connections: bool = False,
     n_rewire: int = 10,
     rewiring_method: str = "bridge",
     tau: float = 0.1,
@@ -715,7 +707,6 @@ def run_iterative_bridge_experiment(
             test_mask=current_test_mask,
             dataset_name=dataset_name,
             do_self_loop=do_self_loop,
-            do_residual_connections=do_residual_connections,
             n_rewire=n_rewire,
             rewiring_method=rewiring_method,
             tau=tau,
