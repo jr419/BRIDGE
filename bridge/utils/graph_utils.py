@@ -213,6 +213,11 @@ def sparse_add(A: torch.Tensor, B: torch.Tensor) -> torch.Tensor:
     Returns:
         torch.Tensor: Sum of the two sparse tensors
     """
+    # Ensure inputs are coalesced before accessing indices/values
+    if not A.is_coalesced():
+        A = A.coalesce()
+    if not B.is_coalesced():
+        B = B.coalesce()
     indices = torch.cat([A.indices(), B.indices()], dim=1)
     values = torch.cat([A.values(), B.values()])
     C = torch.sparse_coo_tensor(indices, values, A.shape, device=A.device).coalesce()

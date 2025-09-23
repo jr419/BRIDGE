@@ -49,7 +49,6 @@ def test_objective_callable_smoke(monkeypatch):
             n_epochs=1,
             num_splits=1,
             early_stopping=1,
-            do_hp=False,
             do_self_loop=False,
             dataset_name='cora'
         )
@@ -66,7 +65,6 @@ def test_objective_callable_smoke(monkeypatch):
             n_epochs=1,
             num_splits=1,
             early_stopping=1,
-            do_hp=False,
             do_self_loop=False,
             dataset_name='cora',
             rewiring_method='bridge',

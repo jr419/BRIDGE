@@ -20,4 +20,5 @@ def test_rewiring_exports():
 def test_models_exports():
     mod = import_module('bridge.models')
     exported = set(getattr(mod, '__all__', []))
-    assert {'GCN', 'HPGraphConv', 'SGC', 'sgc_precompute'}.issubset(exported)
+    # HPGraphConv/SGC were removed; only GCN remains public
+    assert {'GCN'}.issubset(exported)

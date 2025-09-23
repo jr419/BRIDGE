@@ -19,3 +19,11 @@ def test_digl_eps_runs(tiny_graph):
     g2 = digl_rewired(g, method='heat', t=3.0, eps=1e-3)
     assert isinstance(g2, dgl.DGLGraph)
     assert 'weight' in g2.edata
+
+
+def test_digl_avg_degree_runs(tiny_graph):
+    g = tiny_graph(n=8, undirected=True, k=3)
+    # Target average degree 2 (small) to keep it quick
+    g2 = digl_rewired(g, method='ppr', alpha=0.2, avg_degree=2)
+    assert isinstance(g2, dgl.DGLGraph)
+    assert 'weight' in g2.edata

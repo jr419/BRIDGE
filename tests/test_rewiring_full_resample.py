@@ -13,7 +13,9 @@ def make_toy_graph(n=6, undirected=True):
         g = dgl.to_bidirected(g, copy_ndata=True)
     # minimal node data
     g.ndata['feat'] = torch.eye(n)
-    g.ndata['label'] = torch.tensor([0,0,1,1,2,2])
+    # create labels of length n, repeating [0,0,1,1,2,2]
+    labels = torch.tensor([(i // 2) % 3 for i in range(n)], dtype=torch.long)
+    g.ndata['label'] = labels
     g.ndata['train_mask'] = torch.ones(n, dtype=torch.bool)
     g.ndata['val_mask'] = torch.ones(n, dtype=torch.bool)
     g.ndata['test_mask'] = torch.ones(n, dtype=torch.bool)
