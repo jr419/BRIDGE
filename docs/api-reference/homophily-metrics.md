@@ -148,7 +148,6 @@ def class_bottlenecking_score(
     g: dgl.DGLGraph, 
     y: Optional[torch.Tensor] = None,
     self_loops: bool = False,
-    do_hp: bool = False,
     fix_d: bool = True, 
     sym: bool = False, 
     device: Union[str, torch.device] = 'cpu'
@@ -263,7 +262,7 @@ These metrics are particularly useful for:
 
 3. **Selecting Graph Rewiring Strategies**: The metrics can guide the selection of optimal permutation matrices for BRIDGE rewiring.
 
-4. **Choosing Between High-Pass and Low-Pass Filters**: The relationship between homophily and heterophily can inform the choice of GNN architecture.
+
 
 ## Usage in BRIDGE Pipeline
 

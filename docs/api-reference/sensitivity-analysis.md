@@ -483,6 +483,5 @@ Sensitivity analysis provides insights into:
 
 1. **Information Flow**: How effectively information propagates through the graph structure
 2. **Bottleneck Identification**: Nodes or regions with low signal sensitivity
-3. **Architecture Selection**: Whether to use standard or high-pass filters based on graph properties
+3. **Architecture Selection**: Choices like depth and residuals based on graph properties
 4. **Optimal Graph Structure**: What structures maximize signal-to-noise ratio
-

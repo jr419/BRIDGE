@@ -85,7 +85,6 @@ Command-line arguments take precedence over options in the configuration file.
 ## Model Settings
 
 ```bash
---do_hp                         Use higher-order polynomial filters
 --do_self_loop                  Add self-loops to graphs
 --do_residual                   Use residual connections in the base model
 --early_stopping INTEGER        Early stopping patience
@@ -115,7 +114,7 @@ Supported standard datasets include: cora, citeseer, pubmed, actor, chameleon, s
 ### Base Model Hyperparameters
 
 ```bash
---model_type TEXT               Model type (GCN, GAT, GIN, GRAPHSAGE)
+--model_type TEXT               Model type (GCN)
 --mpnn_h_feats INTEGER...       Hidden feature dimensions to try for base model
 --mpnn_n_layers INTEGER...      Number of layers to try for base model
 --mpnn_dropout_range FLOAT FLOAT Dropout range for base model [min, max]
@@ -128,10 +127,6 @@ Supported standard datasets include: cora, citeseer, pubmed, actor, chameleon, s
 ```bash
 --use_iterative_rewiring        Use the iterative rewiring pipeline
 --n_rewire_iterations_range INTEGER INTEGER   Range of rewiring iterations [min, max]
---use_sgc                       Use SGC for fast predictions in the iterative pipeline
---sgc_K_options INTEGER...      Options for SGC propagation steps
---sgc_lr_range FLOAT FLOAT      Learning rate range for SGC
---sgc_wd_range FLOAT FLOAT      Weight decay range for SGC
 --rewiring_method {bridge,sdrf,digl} Choose rewiring method
 --sdrf_tau_range FLOAT FLOAT    SDRF tau range
 --sdrf_iterations_range INTEGER INTEGER   SDRF iteration range

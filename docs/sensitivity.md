@@ -50,14 +50,6 @@ A key finding from our analysis is the relationship between graph homophily and 
 - SNR increases symmetrically as homophily either increases toward 1 or decreases toward 0
 - This explains the "mid-homophily pitfall" observed in prior work, where MPNNs perform worst at ambiphily
 
-### High-Pass vs. Low-Pass Filters
-
-Our sensitivity analysis reveals when high-pass filters (using $I - \hat{A}$ as the graph operator) outperform standard low-pass filters:
-
-- High-pass filters achieve higher SNR than low-pass filters for all heterophilic graphs (edge homophily $h < \frac{1}{k}$)
-- Even for mildly homophilic graphs, high-pass filters can achieve higher SNR under certain conditions
-- The transition point depends on the number of classes and the order of homophily being considered
-
 ### Node-Level Bottleneck Analysis
 
 The sensitivity framework allows for node-level analysis of bottlenecks:

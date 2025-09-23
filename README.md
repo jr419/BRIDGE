@@ -27,14 +27,12 @@ This repository contains two main packages:
 
 - **Graph Rewiring**
   - SBM-based graph rewiring to optimize network structure
-  - Iterative rewiring with fast SGC-based predictions
+  - Iterative rewiring for improved topology
   - Support for both homophilic and heterophilic settings
-  - Selective GNN models that choose the best graph structure for each node
+  - Standard training on original and rewired graphs
 
 - **GNN Models**
   - Graph Convolutional Networks (GCN) with various configurations
-  - High/Low-Pass graph convolution filter models
-  - Selective GNN models that can choose the best graph structure for each node
 
 - **Sensitivity Analysis**
   - Signal, noise, and global sensitivity estimation
@@ -60,7 +58,7 @@ pip install -e .
 import dgl
 import torch
 from bridge.models import GCN
-from bridge.rewiring import run_iterative_bridge_pipeline
+from bridge.rewiring import run_bridge_pipeline
 from bridge.utils import generate_all_symmetric_permutation_matrices
 
 # Load a dataset
@@ -72,18 +70,14 @@ k = len(torch.unique(g.ndata['label']))
 all_matrices = generate_all_symmetric_permutation_matrices(k)
 P_k = all_matrices[0]  # Choose the first permutation matrix
 
-# Run the iterative rewiring pipeline (5 iterations)
-results = run_iterative_bridge_pipeline(
+# Run the rewiring pipeline
+results = run_bridge_pipeline(
     g=g,
     P_k=P_k,
-    h_feats_gcn=64,
-    n_layers_gcn=2,
-    dropout_p_gcn=0.5,
-    model_lr_gcn=1e-3,
-    h_feats_selective=64,
-    n_layers_selective=2,
-    dropout_p_selective=0.5,
-    model_lr_selective=1e-3,
+    h_feats_mpnn=64,
+    n_layers_mpnn=2,
+    dropout_p_mpnn=0.5,
+    model_lr_mpnn=1e-3,
     num_graphs=1,
     n_rewire=5,
     device='cuda' if torch.cuda.is_available() else 'cpu'
@@ -91,7 +85,7 @@ results = run_iterative_bridge_pipeline(
 
 # Print results
 print(f"Base GCN accuracy: {results['cold_start']['test_acc']:.4f}")
-print(f"Selective GCN accuracy: {results['selective']['test_acc']:.4f}")
+print(f"Rewired GCN accuracy: {results['rewired']['test_acc']:.4f}")
 ```
 
 ## Sensitivity Analysis Examples
@@ -171,7 +165,7 @@ bridge --config config_examples/real_datasets_test.yaml
 
 ### Main Components
 
-- **Models**: GCN and SelectiveGCN implementations with optional higher-order polynomial filters
+- **Models**: Standard GCN implementation
 - **Rewiring**: Functions for rewiring graph structures based on stochastic block models
 - **Training**: Training loops and evaluation metrics for GNNs
 - **Optimization**: Hyperparameter optimization with Optuna
@@ -181,7 +175,6 @@ bridge --config config_examples/real_datasets_test.yaml
 
 ### Key Parameters
 
-- `do_hp`: Use high-pass filters (I - A_hat)
 - `do_self_loop`: Add self-loops to graph nodes
 - `do_residual_connections`: Use residual connections in GCN layers
 - `p_add`: Probability of adding new edges during rewiring

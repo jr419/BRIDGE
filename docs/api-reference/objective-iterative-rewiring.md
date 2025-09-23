@@ -21,15 +21,10 @@ objective_iterative_rewiring(
     num_splits: int = 100,
     early_stopping: int = 50,
     model_type: str = 'GCN',
-    do_hp: bool = False,
     do_self_loop: bool = False,
     do_residual_connections: bool = False,
     dataset_name: str = 'unknown',
     n_rewire_iterations_range: List[int] = None,
-    use_sgc: bool = True,
-    sgc_K_options: List[int] = None,
-    sgc_lr_range: List[float] = None,
-    sgc_wd_range: List[float] = None,
     rewiring_method: str = "bridge",
     sdrf_tau_range: list = [0.01, 300],
     sdrf_n_iterations_range: list = [1, 300],
@@ -47,5 +42,4 @@ objective_iterative_rewiring(
 
 - `matrix_idx`, `d_out`
 - Iterative parameters: `n_rewire_iterations`
-- SGC parameters: `sgc_K`, `sgc_lr`, `sgc_wd`
 - Alternative rewiring parameters (if used): SDRF (`sdrf_tau`, `sdrf_iterations`, `sdrf_c_plus`) and DIGL (`digl_diffusion_type`, `digl_alpha`, `digl_k`, `digl_t`, `digl_epsilon`)

@@ -27,7 +27,6 @@ def class_bottlenecking_score(
     g: dgl.DGLGraph, 
     y: Optional[torch.Tensor] = None,
     self_loops: bool = False,
-    do_hp: bool = False,
     fix_d: bool = True, 
     sym: bool = False, 
     device: Union[str, torch.device] = 'cpu'
@@ -42,7 +41,6 @@ def class_bottlenecking_score(
 | `g` | dgl.DGLGraph | Input graph |
 | `y` | Optional[torch.Tensor] | Node labels of shape (n_nodes,); if None will use g.ndata['label'] |
 | `self_loops` | bool | Whether to include self-loops in adjacency |
-| `do_hp` | bool | Whether to compute higher-order polynomial version (I - A) |
 | `fix_d` | bool | If True, row-normalize adjacency (D^{-1}A) |
 | `sym` | bool | Whether to symmetrize adjacency (A <- A + A^T) |
 | `device` | Union[str, torch.device] | Device to perform computation on |
@@ -91,19 +89,6 @@ low_cb_nodes = torch.argsort(cb_scores)[:10]
 print(f"Nodes with lowest class-bottlenecking score: {low_cb_nodes}")
 ```
 
-### Using High-Pass Filter
-
-```python
-# Compute high-pass filter version (I - A) of the score
-hp_scores = class_bottlenecking_score(p=2, g=g, do_hp=True)
-
-# Compare with the standard version
-standard_scores = class_bottlenecking_score(p=2, g=g, do_hp=False)
-
-# Print the difference
-diff = hp_scores - standard_scores
-print(f"Mean difference (high-pass - standard): {diff.mean().item():.4f}")
-```
 
 ### Using Custom Labels
 
@@ -147,19 +132,15 @@ The `class_bottlenecking_score` function implements the following algorithm:
    - Optionally adds self-loops or symmetrizes the matrix
    - Normalizes the adjacency matrix using D^{-1/2}AD^{-1/2}
 
-2. **Apply High-Pass Filter** (if `do_hp=True`):
-   - Transforms the adjacency matrix to I - A
-   - This emphasizes differences between nodes rather than similarities
-
-3. **Compute One-Hot Label Matrix**:
+2. **Compute One-Hot Label Matrix**:
    - Creates a matrix M where M[i,c] = 1 if node i has class c, otherwise 0
 
-4. **Compute (A^p)M**:
+3. **Compute (A^p)M**:
    - Raises the adjacency matrix to power p
    - Multiplies by the label matrix
    - This gives the influence from each class on each node through p-hop paths
 
-5. **Compute Class-Bottlenecking Scores**:
+4. **Compute Class-Bottlenecking Scores**:
    - For each node i, computes the sum of squares of influences from each class
    - This measures how much influence comes from nodes of the same class
 

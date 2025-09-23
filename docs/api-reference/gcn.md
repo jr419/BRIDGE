@@ -32,8 +32,7 @@ class GCN(nn.Module):
         dropout_p: float, 
         activation: Callable = F.relu, 
         bias: bool = True, 
-        residual_connection: bool = False,
-        do_hp: bool = False
+        residual_connection: bool = False
     ):
         # Implementation details...
         
@@ -55,7 +54,6 @@ class GCN(nn.Module):
 | `activation` | Callable | Activation function to use (default: F.relu) |
 | `bias` | bool | Whether to use bias in GraphConv layers |
 | `residual_connection` | bool | Whether to use residual connections |
-| `do_hp` | bool | Whether to use HPGraphConv instead of GraphConv |
 
 ### Forward Method Parameters
 
@@ -97,22 +95,6 @@ output = model(g, g.ndata['feat'])
 print(output.shape)  # Should be (3, 2)
 ```
 
-### With High-Pass Filter
-
-```python
-# Create a GCN model with high-pass filters
-high_pass_model = GCN(
-    in_feats=5,
-    h_feats=16,
-    out_feats=2,
-    n_layers=2,
-    dropout_p=0.5,
-    do_hp=True  # Use high-pass filters
-)
-
-# Forward pass
-output = high_pass_model(g, g.ndata['feat'])
-```
 
 ### With Residual Connections
 
@@ -133,17 +115,13 @@ output = residual_model(g, g.ndata['feat'])
 
 ## Implementation Details
 
-The GCN class consists of a stack of graph convolution layers. If `do_hp` is False, the model uses DGL's standard `GraphConv` layers. If `do_hp` is True, the model uses the `HPGraphConv` layers, which implement a high-pass filter.
-
-The forward pass processes the input features through the layers, applying activation functions and dropout after each layer except the final one.
+The GCN class consists of a stack of DGL `GraphConv` layers. The forward pass processes the input features through the layers, applying activation functions and dropout after each layer except the final one.
 
 For each layer in the stack:
 1. Apply graph convolution to the input features
 2. If not the output layer, apply activation function
 3. If not the output layer, apply dropout
 
-Note that if `do_hp` is True, the architecture changes to use high-pass filters, which emphasize the difference between a node's features and its neighbors' features (computed as I - GCN).
-
 ## Related Components
 
-- [HPGraphConv](api-reference/hpgraphconv.html): High-Pass Graph Convolution layer used when `do_hp=True`
+- Training utilities and optimization objectives in this package

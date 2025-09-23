@@ -19,7 +19,7 @@ parent: API Reference
 
 The `run_bridge_pipeline` function implements the complete BRIDGE (Block Rewiring from Inference-Derived Graph Ensembles) pipeline. This pipeline optimizes graph neural networks through inference-derived graph rewiring.
 
-Rewiring now always uses hard predictions (argmax over logits) and fully resamples the adjacency from optimal edge probabilities. There is no temperature parameter and no p_add/p_remove. The pipeline trains a standard model only (no selective models).
+Rewiring now always uses hard predictions (argmax over logits) and fully resamples the adjacency from optimal edge probabilities. There is no temperature parameter and no p_add/p_remove. The pipeline trains a standard model.
 
 ## Function Signature
 
@@ -43,7 +43,6 @@ def run_bridge_pipeline(
     val_mask: Optional[torch.Tensor] = None,
     test_mask: Optional[torch.Tensor] = None,
     dataset_name: str = 'unknown',
-    do_hp: bool = False,
     do_self_loop: bool = False,
     do_residual_connections: bool = False
 ) -> Dict[str, Any]
@@ -71,7 +70,6 @@ def run_bridge_pipeline(
 | `val_mask` | Optional[torch.Tensor] | Boolean mask indicating validation nodes |
 | `test_mask` | Optional[torch.Tensor] | Boolean mask indicating test nodes |
 | `dataset_name` | str | Name of the dataset |
-| `do_hp` | bool | Whether to use high-pass filters |
 | `do_self_loop` | bool | Whether to add self-loops |
 | `do_residual_connections` | bool | Whether to use residual connections |
 
@@ -137,4 +135,4 @@ print(f"Rewired Test Accuracy: {results['rewired']['test_acc']:.4f}")
 
 - `P_k` determines the optimal block structure across classes.
 - Predictions are hard; there is no softmax temperature and no partial add/remove probabilities.
-- The `do_hp` parameter enables high-pass filters, which can be beneficial for heterophilic graphs.
+ 

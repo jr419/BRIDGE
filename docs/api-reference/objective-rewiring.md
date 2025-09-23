@@ -21,7 +21,6 @@ objective_rewiring(
     num_splits: int = 100,
     early_stopping: int = 50,
     model_type: str = 'GCN',
-    do_hp: bool = False,
     do_self_loop: bool = False,
     do_residual_connections: bool = False,
     dataset_name: str = 'unknown'

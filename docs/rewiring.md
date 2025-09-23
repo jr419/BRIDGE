@@ -34,4 +34,4 @@ Require: Graph G = (V, E), labels y, classes k, permutation matrix P_k, target m
 
 Notes:
 - No temperature or partial add/remove probabilities.
-- Standard models only; selective models and homophily masks removed.
+- Standard models only; homophily masks removed.
