@@ -24,7 +24,7 @@ from bridge.sensitivity import (
     # New visualization functions will be imported from .visualization
 )
 from bridge.datasets.synthetic import SyntheticGraphDataset
-from bridge.utils.homophily import local_homophily as higher_order_homophily # Renaming for clarity
+from bridge.utils.homophily import class_bottlenecking_score as higher_order_homophily # Renaming for clarity
 from bridge.utils.graph_utils import set_seed
 from bridge.utils.matrix_utils import compute_confidence_interval
 

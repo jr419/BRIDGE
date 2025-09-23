@@ -78,17 +78,17 @@ Our analysis shows that the signal sensitivity of an MPNN is bounded by higher-o
 
 $$S^{(\ell)}_{i,p,q,r} \leq \sum_{s,t=0}^{\ell} \binom{\ell}{s}\binom{\ell}{t} \alpha_1^{2\ell-s-t}(\alpha_2\beta)^{s+t} h^{s,t}_i(\hat{A})$$
 
-where $h^{s,t}_i(\hat{A})$ is the local $(s,t)$-order homophily at node $i$. This bound reveals that higher-order homophily fundamentally limits the ability of MPNNs to leverage class-specific signals.
+where $h^{s,t}_i(\hat{A})$ is the local $(s,t)$-order class-bottlenecking score at node $i$. This bound reveals that higher-order homophily fundamentally limits the ability of MPNNs to leverage class-specific signals.
 
-## Homophilic Bottlenecks
+## Class-Bottlenecks
 
 ### Definition
 
-Homophilic bottlenecks are nodes with low local homophily, which restrict the flow of class-specific information through the network. Unlike general bottlenecks, which impede all information flow, homophilic bottlenecks specifically impact nodes from the same class.
+Class-bottlenecks are nodes with low class-bottlenecking score, which restrict the flow of class-specific information through the network. Unlike general bottlenecks, which impede all information flow, class-bottlenecks specifically impact nodes from the same class.
 
 ### Underreaching and Oversquashing
 
-We decompose the effects of homophilic bottlenecks into two distinct phenomena:
+We decompose the effects of class-bottlenecks into two distinct phenomena:
 
 1. **Underreaching**: The failure of information to propagate between distant nodes of the same class
 2. **Oversquashing**: The interference and compression of information from multiple source nodes as it converges at a target node

@@ -62,7 +62,7 @@ Our sensitivity analysis reveals when high-pass filters (using $I - \hat{A}$ as 
 
 The sensitivity framework allows for node-level analysis of bottlenecks:
 
-- By computing local homophily for each node, we can identify nodes suffering from homophilic bottlenecks
+- By computing the class-bottlenecking score for each node, we can identify nodes suffering from class-bottlenecks
 - The framework predicts which nodes will benefit most from graph rewiring
 
 ## Usage Examples

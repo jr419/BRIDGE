@@ -19,7 +19,7 @@ This repository contains two main packages:
 
 - **Signal-to-Noise Ratio (SNR) Framework**: A novel approach to quantify MPNN performance through signal, noise, and global sensitivity metrics
 - **Higher-Order Homophily**: Measures of multi-hop connectivity between same-class nodes that bound MPNN sensitivity
-- **Homophilic Bottlenecks**: Network structures that restrict information flow between nodes of the same class
+- **Class-Bottlenecks**: Network structures that restrict information flow between nodes of the same class
 - **Optimal Graph Structures**: Characterization of graph structures that maximize performance for given class assignments
 - **Graph Rewiring**: Techniques to modify graph topology to increase higher-order homophily
 
@@ -39,7 +39,7 @@ This repository contains two main packages:
 - **Sensitivity Analysis**
   - Signal, noise, and global sensitivity estimation
   - SNR calculation using Monte Carlo or theorem-based formulas
-  - Node-level analysis of homophilic bottlenecks
+- Node-level analysis of class-bottlenecks
 
 - **Optimization & Experiments**
   - Hyperparameter optimization with Optuna

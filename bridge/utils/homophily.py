@@ -83,7 +83,7 @@ def sparse_mm(sparse_A: torch.Tensor, dense_B: torch.Tensor) -> torch.Tensor:
     return torch.sparse.mm(sparse_A, dense_B)
 
 
-def local_homophily(
+def class_bottlenecking_score(
     p: int, 
     g: dgl.DGLGraph, 
     y: Optional[torch.Tensor] = None,
@@ -94,13 +94,13 @@ def local_homophily(
     device: Union[str, torch.device] = 'cpu'
 ) -> torch.Tensor:
     """
-    Compute the local p-homophily for each node in the graph.
-    
-    Local homophily measures how similar a node's features are to its p-hop neighbors
-    with respect to class labels.
-    
+    Compute the local class-bottlenecking score for each node in the graph over p hops.
+
+    The class-bottlenecking score measures how strongly a node connects to
+    same-class nodes within p hops (with respect to class labels).
+
     Args:
-        p: The 'order' of homophily (number of hops)
+        p: The hop order (number of hops)
         g: Input graph
         y: Node labels of shape (n_nodes,), if None will use g.ndata['label']
         self_loops: Whether to include self-loops in adjacency
@@ -108,9 +108,9 @@ def local_homophily(
         fix_d: If True, row-normalize adjacency (D^{-1}A)
         sym: Whether to symmetrize adjacency (A <- A + A^T)
         device: Device to perform computation on
-        
+
     Returns:
-        torch.Tensor: The local homophily scores for each node
+        torch.Tensor: The class-bottlenecking scores for each node
     """
     device = torch.device(device)
 
@@ -144,13 +144,13 @@ def local_homophily(
     # 4) Compute S = (A^p) M  (shape: n x C)
     S = power_adj_times_matrix(A, M, p)
 
-    # 5) local_homophily(i) = sum_{c} S[i,c]^2
+    # 5) class-bottlenecking score(i) = sum_{c} S[i,c]^2
     homophily_scores = (S**2).sum(dim=1)
 
     return homophily_scores.detach().cpu()
 
 
-def local_autophily(
+def self_bottlenecking_score(
     p: int,
     g: dgl.DGLGraph,
     self_loops: bool = False,
@@ -160,22 +160,22 @@ def local_autophily(
     device: Union[str, torch.device] = 'cpu'
 ) -> np.ndarray:
     """
-    Compute the local autophily for each node in the graph.
-    
-    Autophily measures how similar a node is to itself through its neighborhood,
-    regardless of class labels.
-    
+    Compute the self bottlenecking score (local self-connectivity) for each node.
+
+    Self-connectivity measures how strongly a node reconnects to itself through
+    its neighborhood, regardless of class labels.
+
     Args:
-        p: The order of the local autophily
+        p: The order for the self bottlenecking score
         g: Input graph
         self_loops: Whether to include self-loops in the adjacency matrix
         do_hp : Whether to compute higher-order polynomial version (I - A)
         fix_d: Whether to fix the degree distribution by normalizing
         sym: Whether to symmetrize the adjacency matrix
         device: Device to perform computations on
-        
+
     Returns:
-        np.ndarray: An array containing the local autophily scores for each node
+        np.ndarray: An array containing the self bottlenecking scores (self-connectivity) for each node
     """
     device = torch.device(device)
 
@@ -196,18 +196,18 @@ def local_autophily(
         A = I - A
 
     # 3) Build label matrix M
-    M = torch.eye(A.size(0), device=device)  # Identity matrix for autophily
+    M = torch.eye(A.size(0), device=device)  # Identity matrix for self-connectivity
 
     # 4) Compute S = (A^p)  (shape: n x C)
     S = power_adj_times_matrix(A, M, p)
 
-    # 5) local_autophily(i) =  S[i,i]^2
+    # 5) self bottlenecking score(i) =  S[i,i]^2
     autophily_scores = S.diag()**2
 
     return autophily_scores.detach().cpu()
 
 
-def local_total_connectivity(
+def total_bottlenecking_score(
     p: int,
     g: dgl.DGLGraph,
     self_loops: bool = False,
@@ -217,21 +217,22 @@ def local_total_connectivity(
     device: Union[str, torch.device] = 'cpu'
 ) -> np.ndarray:
     """
-    Compute the local total connectivity for each node in the graph.
-    
-    Total connectivity measures how well connected a node is to its p-hop neighborhood.
-    
+    Compute the total bottlenecking score for each node in the graph.
+
+    The total bottlenecking score measures how well a node connects within its
+    p-hop neighborhood overall.
+
     Args:
-        p: The order of the local connectivity
+        p: The order for the total bottlenecking score
         g: Input graph
         self_loops: Whether to include self-loops in the adjacency matrix
         do_hp: Whether to compute higher-order polynomial version (I - A)
         fix_d: Whether to fix the degree distribution by normalizing
         sym: Whether to symmetrize the adjacency matrix
         device: Device to perform computations on
-        
+
     Returns:
-        np.ndarray: An array containing the local total connectivity scores for each node
+        np.ndarray: An array containing the total bottlenecking scores for each node
     """
     device = torch.device(device)
 
@@ -252,12 +253,17 @@ def local_total_connectivity(
         A = I - A
 
     # 3) Build label matrix M
-    M = torch.eye(A.size(0), device=device)  # Identity matrix for total_connectivity
+    M = torch.eye(A.size(0), device=device)  # Identity matrix for total bottlenecking
 
     # 4) Compute S = (A^p)  (shape: n x C)
     S = power_adj_times_matrix(A, M, p)
 
-    # 5) local_total_connectivity(i) = sum_{j} S[i,j]^2
+    # 5) total bottlenecking score(i) = sum_{j} S[i,j]^2
     total_connectivity_scores = (S**2).sum(dim=1)
 
     return total_connectivity_scores.detach().cpu()
+
+# Backward-compatibility aliases
+local_homophily = class_bottlenecking_score
+local_autophily = self_bottlenecking_score
+local_total_connectivity = total_bottlenecking_score

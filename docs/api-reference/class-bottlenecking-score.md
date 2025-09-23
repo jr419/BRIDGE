@@ -1,10 +1,10 @@
 ---
 layout: default
-title: local_homophily
+title: class_bottlenecking_score
 parent: API Reference
 ---
 
-# local_homophily
+# class_bottlenecking_score
 {: .no_toc }
 
 ## Table of contents
@@ -17,12 +17,12 @@ parent: API Reference
 
 ## Overview
 
-The `local_homophily` function computes the local p-hop homophily for each node in a graph. Local homophily measures how similar a node's features are to its p-hop neighbors with respect to class labels. This metric is crucial for understanding the information flow in graph neural networks and identifying homophilic bottlenecks.
+The `class_bottlenecking_score` function computes the local class-bottlenecking score for each node in a graph over p hops. This score measures how strongly a node connects to same-class nodes within p hops. It is crucial for understanding the information flow in graph neural networks and identifying class-bottlenecks.
 
 ## Function Signature
 
 ```python
-def local_homophily(
+def class_bottlenecking_score(
     p: int, 
     g: dgl.DGLGraph, 
     y: Optional[torch.Tensor] = None,
@@ -51,11 +51,11 @@ def local_homophily(
 
 | Return Type | Description |
 |-------------|-------------|
-| torch.Tensor | Tensor of shape (n_nodes,) containing the local homophily scores for each node |
+| torch.Tensor | Tensor of shape (n_nodes,) containing the class-bottlenecking scores for each node |
 
 ## Mathematical Definition
 
-For a node i, the local p-homophily is defined as:
+For a node i, the local class-bottlenecking score (order p) is defined as:
 
 $$h^{(p)}_i = \sum_{c=1}^{C} \left( \sum_{j: y_j = c} \hat{A}^p_{ij} \right)^2$$
 
@@ -74,34 +74,34 @@ This measure quantifies how much information from nodes of the same class can re
 ```python
 import torch
 import dgl
-from bridge.utils import local_homophily
+from bridge.utils import class_bottlenecking_score
 
 # Load a dataset
 dataset = dgl.data.CoraGraphDataset()
 g = dataset[0]
 
-# Compute 2-hop local homophily for each node
-homophily_scores = local_homophily(p=2, g=g)
+# Compute 2-hop class-bottlenecking score for each node
+cb_scores = class_bottlenecking_score(p=2, g=g)
 
-# Print average homophily
-print(f"Average 2-hop homophily: {homophily_scores.mean().item():.4f}")
+# Print average class-bottlenecking score
+print(f"Average 2-hop class-bottlenecking score: {cb_scores.mean().item():.4f}")
 
-# Find nodes with lowest homophily (bottlenecks)
-low_homophily_nodes = torch.argsort(homophily_scores)[:10]
-print(f"Nodes with lowest homophily: {low_homophily_nodes}")
+# Find nodes with lowest scores (bottlenecks)
+low_cb_nodes = torch.argsort(cb_scores)[:10]
+print(f"Nodes with lowest class-bottlenecking score: {low_cb_nodes}")
 ```
 
 ### Using High-Pass Filter
 
 ```python
-# Compute high-pass filter version (I - A) homophily
-hp_homophily_scores = local_homophily(p=2, g=g, do_hp=True)
+# Compute high-pass filter version (I - A) of the score
+hp_scores = class_bottlenecking_score(p=2, g=g, do_hp=True)
 
-# Compare with standard homophily
-standard_homophily = local_homophily(p=2, g=g, do_hp=False)
+# Compare with the standard version
+standard_scores = class_bottlenecking_score(p=2, g=g, do_hp=False)
 
 # Print the difference
-diff = hp_homophily_scores - standard_homophily
+diff = hp_scores - standard_scores
 print(f"Mean difference (high-pass - standard): {diff.mean().item():.4f}")
 ```
 
@@ -114,33 +114,33 @@ import torch
 n_nodes = g.num_nodes()
 custom_labels = torch.randint(0, 3, (n_nodes,))  # 3 classes
 
-# Compute homophily with respect to these labels
-custom_homophily = local_homophily(p=2, g=g, y=custom_labels)
+# Compute scores with respect to these labels
+custom_scores = class_bottlenecking_score(p=2, g=g, y=custom_labels)
 
-# Compare with homophily based on true labels
-true_homophily = local_homophily(p=2, g=g)  # Uses g.ndata['label']
+# Compare with scores based on true labels
+true_scores = class_bottlenecking_score(p=2, g=g)  # Uses g.ndata['label']
 
-print(f"Custom labels homophily: {custom_homophily.mean().item():.4f}")
-print(f"True labels homophily: {true_homophily.mean().item():.4f}")
+print(f"Custom labels class-bottlenecking: {custom_scores.mean().item():.4f}")
+print(f"True labels class-bottlenecking: {true_scores.mean().item():.4f}")
 ```
 
 ### Comparison Across Multiple Hop Distances
 
 ```python
-# Compute homophily at different hop distances
-homophily_1hop = local_homophily(p=1, g=g)
-homophily_2hop = local_homophily(p=2, g=g)
-homophily_3hop = local_homophily(p=3, g=g)
+# Compute scores at different hop distances
+cb_1hop = class_bottlenecking_score(p=1, g=g)
+cb_2hop = class_bottlenecking_score(p=2, g=g)
+cb_3hop = class_bottlenecking_score(p=3, g=g)
 
 # Print averages
-print(f"1-hop homophily: {homophily_1hop.mean().item():.4f}")
-print(f"2-hop homophily: {homophily_2hop.mean().item():.4f}")
-print(f"3-hop homophily: {homophily_3hop.mean().item():.4f}")
+print(f"1-hop class-bottlenecking: {cb_1hop.mean().item():.4f}")
+print(f"2-hop class-bottlenecking: {cb_2hop.mean().item():.4f}")
+print(f"3-hop class-bottlenecking: {cb_3hop.mean().item():.4f}")
 ```
 
 ## Implementation Details
 
-The `local_homophily` function implements the following algorithm:
+The `class_bottlenecking_score` function implements the following algorithm:
 
 1. **Build Sparse Adjacency Matrix**:
    - Converts the DGL graph to a sparse adjacency matrix
@@ -159,9 +159,8 @@ The `local_homophily` function implements the following algorithm:
    - Multiplies by the label matrix
    - This gives the influence from each class on each node through p-hop paths
 
-5. **Compute Homophily Scores**:
+5. **Compute Class-Bottlenecking Scores**:
    - For each node i, computes the sum of squares of influences from each class
    - This measures how much influence comes from nodes of the same class
 
 The implementation is optimized for sparse graphs and can handle large networks efficiently.
-

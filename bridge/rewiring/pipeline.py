@@ -18,14 +18,13 @@ import copy
 from ..models import GCN, SGC
 from ..training import train, get_metric_type
 from ..utils import (
-    set_seed, check_symmetry, local_homophily, local_autophily, local_total_connectivity,
+    set_seed, check_symmetry,
+    class_bottlenecking_score, self_bottlenecking_score, total_bottlenecking_score,
     compute_confidence_interval, estimate_iid_variances
 )
 from .operations import create_rewired_graph
 from .sdrf import sdrf_rewire
 from .digl import digl_rewired
-
-# Local factory for creating standard models (no selective models)
 
 def create_model(
     model_type: str,
@@ -111,12 +110,12 @@ def run_bridge_pipeline(
         num_nodes = graph.num_nodes()
         num_edges = graph.num_edges()
         mean_degree = graph.in_degrees().float().mean().item()
-        mean_local_homophily = local_homophily(n_layers_mpnn+1, graph, do_hp=do_hp).mean().item()
+        mean_class_bottlenecking_score = class_bottlenecking_score(n_layers_mpnn+1, graph, do_hp=do_hp).mean().item()
         stats = {
             'num_nodes': num_nodes,
             'num_edges': num_edges,
             'mean_degree': mean_degree,
-            'mean_local_homophily': mean_local_homophily,
+            'mean_class_bottlenecking_score': mean_class_bottlenecking_score,
         }
         return stats
 
@@ -294,8 +293,8 @@ def run_bridge_experiment(
     edges_removed_list = []
     original_density_list = []
     rewired_density_list = []
-    original_homophily_list = []
-    rewired_homophily_list = []
+    original_class_bottlenecking_list = []
+    rewired_class_bottlenecking_list = []
     original_degree_list = []
     rewired_degree_list = []
     
@@ -347,8 +346,8 @@ def run_bridge_experiment(
         
         original_density_list.append(original_density)
         rewired_density_list.append(rewired_density)
-        original_homophily_list.append(results['original_stats']['mean_local_homophily'])
-        rewired_homophily_list.append(results['rewired_stats']['mean_local_homophily'])
+        original_class_bottlenecking_list.append(results['original_stats']['mean_class_bottlenecking_score'])
+        rewired_class_bottlenecking_list.append(results['rewired_stats']['mean_class_bottlenecking_score'])
         original_degree_list.append(results['original_stats']['mean_degree'])
         rewired_degree_list.append(results['rewired_stats']['mean_degree'])
 
@@ -364,12 +363,12 @@ def run_bridge_experiment(
         'edges_removed': compute_stats(edges_removed_list),
         'original_stats': {
             'density': compute_stats(original_density_list),
-            'homophily': compute_stats(original_homophily_list),
+            'class_bottlenecking': compute_stats(original_class_bottlenecking_list),
             'degree': compute_stats(original_degree_list)
         },
         'rewired_stats': {
             'density': compute_stats(rewired_density_list),
-            'homophily': compute_stats(rewired_homophily_list),
+            'class_bottlenecking': compute_stats(rewired_class_bottlenecking_list),
             'degree': compute_stats(rewired_degree_list)
         }
     }
@@ -387,16 +386,16 @@ def run_bridge_experiment(
         'original_stats': {
             'density_mean': stats_dict['original_stats']['density']['mean'],
             'density_ci': stats_dict['original_stats']['density']['ci'],
-            'homophily_mean': stats_dict['original_stats']['homophily']['mean'],
-            'homophily_ci': stats_dict['original_stats']['homophily']['ci'],
+            'class_bottlenecking_mean': stats_dict['original_stats']['class_bottlenecking']['mean'],
+            'class_bottlenecking_ci': stats_dict['original_stats']['class_bottlenecking']['ci'],
             'degree_mean': stats_dict['original_stats']['degree']['mean'],
             'degree_ci': stats_dict['original_stats']['degree']['ci']
         },
         'rewired_stats': {
             'density_mean': stats_dict['rewired_stats']['density']['mean'],
             'density_ci': stats_dict['rewired_stats']['density']['ci'],
-            'homophily_mean': stats_dict['rewired_stats']['homophily']['mean'],
-            'homophily_ci': stats_dict['rewired_stats']['homophily']['ci'],
+            'class_bottlenecking_mean': stats_dict['rewired_stats']['class_bottlenecking']['mean'],
+            'class_bottlenecking_ci': stats_dict['rewired_stats']['class_bottlenecking']['ci'],
             'degree_mean': stats_dict['rewired_stats']['degree']['mean'],
             'degree_ci': stats_dict['rewired_stats']['degree']['ci']
         }
@@ -445,7 +444,7 @@ def run_iterative_bridge_pipeline(
     simulated_acc: Optional[float] = None
 ) -> Dict[str, Any]:
     """
-    Iterative BRIDGE pipeline without selective models.
+    Iterative BRIDGE pipeline.
     Trains a standard model on the final rewired graph.
     """
     set_seed(seed)
@@ -469,12 +468,12 @@ def run_iterative_bridge_pipeline(
         num_nodes = graph.num_nodes()
         num_edges = graph.num_edges()
         mean_degree = graph.in_degrees().float().mean().item()
-        mean_local_homophily = local_homophily(l, graph, do_hp=do_hp).mean().item()
+        mean_class_bottlenecking_score = class_bottlenecking_score(l, graph, do_hp=do_hp).mean().item()
         stats = {
             'num_nodes': num_nodes,
             'num_edges': num_edges,
             'mean_degree': mean_degree,
-            'mean_local_homophily': mean_local_homophily,
+            'mean_class_bottlenecking_score': mean_class_bottlenecking_score,
         }
         return stats
 
@@ -697,8 +696,8 @@ def run_iterative_bridge_experiment(
     edges_removed_list = []
     original_density_list = []
     rewired_density_list = []
-    original_homophily_list = []
-    rewired_homophily_list = []
+    original_class_bottlenecking_list = []
+    rewired_class_bottlenecking_list = []
     original_degree_list = []
     rewired_degree_list = []
     
@@ -765,8 +764,8 @@ def run_iterative_bridge_experiment(
         
         original_density_list.append(original_density)
         rewired_density_list.append(rewired_density)
-        original_homophily_list.append(results['original_stats']['mean_local_homophily'])
-        rewired_homophily_list.append(results['rewired_stats']['mean_local_homophily'])
+        original_class_bottlenecking_list.append(results['original_stats']['mean_class_bottlenecking_score'])
+        rewired_class_bottlenecking_list.append(results['rewired_stats']['mean_class_bottlenecking_score'])
         original_degree_list.append(results['original_stats']['mean_degree'])
         rewired_degree_list.append(results['rewired_stats']['mean_degree'])
 
@@ -782,12 +781,12 @@ def run_iterative_bridge_experiment(
         'edges_removed': compute_stats(edges_removed_list),
         'original_stats': {
             'density': compute_stats(original_density_list),
-            'homophily': compute_stats(original_homophily_list),
+            'class_bottlenecking': compute_stats(original_class_bottlenecking_list),
             'degree': compute_stats(original_degree_list)
         },
         'rewired_stats': {
             'density': compute_stats(rewired_density_list),
-            'homophily': compute_stats(rewired_homophily_list),
+            'class_bottlenecking': compute_stats(rewired_class_bottlenecking_list),
             'degree': compute_stats(rewired_degree_list)
         }
     }
@@ -805,16 +804,16 @@ def run_iterative_bridge_experiment(
         'original_stats': {
             'density_mean': stats_dict['original_stats']['density']['mean'],
             'density_ci': stats_dict['original_stats']['density']['ci'],
-            'homophily_mean': stats_dict['original_stats']['homophily']['mean'],
-            'homophily_ci': stats_dict['original_stats']['homophily']['ci'],
+            'class_bottlenecking_mean': stats_dict['original_stats']['class_bottlenecking']['mean'],
+            'class_bottlenecking_ci': stats_dict['original_stats']['class_bottlenecking']['ci'],
             'degree_mean': stats_dict['original_stats']['degree']['mean'],
             'degree_ci': stats_dict['original_stats']['degree']['ci']
         },
         'rewired_stats': {
             'density_mean': stats_dict['rewired_stats']['density']['mean'],
             'density_ci': stats_dict['rewired_stats']['density']['ci'],
-            'homophily_mean': stats_dict['rewired_stats']['homophily']['mean'],
-            'homophily_ci': stats_dict['rewired_stats']['homophily']['ci'],
+            'class_bottlenecking_mean': stats_dict['rewired_stats']['class_bottlenecking']['mean'],
+            'class_bottlenecking_ci': stats_dict['rewired_stats']['class_bottlenecking']['ci'],
             'degree_mean': stats_dict['rewired_stats']['degree']['mean'],
             'degree_ci': stats_dict['rewired_stats']['degree']['ci']
         }

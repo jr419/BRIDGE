@@ -6,7 +6,9 @@ parent: API Reference
 
 # Homophily Metrics
 
-Documentation for computing local and global homophily metrics.
+Documentation for computing local and global connectivity metrics, including
+class-bottlenecking score, self bottlenecking score (self-connectivity), and
+total bottlenecking score.
 
 ## Table of contents
 {: .no_toc .text-delta }
@@ -22,10 +24,10 @@ The homophily metrics module provides functions for computing various measures o
 
 ## Metrics Functions
 
-### local_autophily
+### self_bottlenecking_score
 
 ```python
-def local_autophily(
+def self_bottlenecking_score(
     p: int,
     g: dgl.DGLGraph,
     self_loops: bool = False,
@@ -35,13 +37,13 @@ def local_autophily(
 ) -> np.ndarray
 ```
 
-Computes the local autophily for each node in the graph. Autophily measures how similar a node is to itself through its neighborhood, regardless of class labels.
+Computes the self bottlenecking score (local self-connectivity) for each node. Self-connectivity measures how strongly a node reconnects to itself through its neighborhood, regardless of class labels.
 
 #### Parameters
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `p` | int | The order of the local autophily |
+| `p` | int | The order for the self bottlenecking score |
 | `g` | dgl.DGLGraph | Input graph |
 | `self_loops` | bool | Whether to include self-loops in the adjacency matrix |
 | `fix_d` | bool | Whether to fix the degree distribution by normalizing |
@@ -52,11 +54,11 @@ Computes the local autophily for each node in the graph. Autophily measures how 
 
 | Return Type | Description |
 |-------------|-------------|
-| np.ndarray | An array containing the local autophily scores for each node |
+| np.ndarray | An array containing the self bottlenecking scores (self-connectivity) for each node |
 
 #### Mathematical Definition
 
-For a node i, the local p-autophily is defined as:
+For a node i, the local p-self-connectivity (self bottlenecking score) is defined as:
 
 $$\omega^{(p)}_i = \sum_j (\hat{A}^p_{ij})^2$$
 
@@ -67,23 +69,23 @@ where $\hat{A}$ is the normalized adjacency matrix.
 ```python
 import torch
 import dgl
-from bridge.utils import local_autophily
+from bridge.utils import self_bottlenecking_score
 
 # Load a dataset
 dataset = dgl.data.CoraGraphDataset()
 g = dataset[0]
 
-# Compute 2-hop local autophily for each node
-autophily_scores = local_autophily(p=2, g=g)
+# Compute 2-hop self bottlenecking score (self-connectivity) for each node
+self_connectivity_scores = self_bottlenecking_score(p=2, g=g)
 
-# Print average autophily
-print(f"Average 2-hop autophily: {autophily_scores.mean():.4f}")
+# Print average self-connectivity
+print(f"Average 2-hop self-connectivity: {self_connectivity_scores.mean():.4f}")
 ```
 
-### local_total_connectivity
+### total_bottlenecking_score
 
 ```python
-def local_total_connectivity(
+def total_bottlenecking_score(
     p: int,
     g: dgl.DGLGraph,
     self_loops: bool = False,
@@ -93,7 +95,7 @@ def local_total_connectivity(
 ) -> np.ndarray
 ```
 
-Computes the local total connectivity for each node in the graph. Total connectivity measures how well connected a node is to its p-hop neighborhood.
+Computes the total bottlenecking score for each node in the graph. This measures how well a node connects within its p-hop neighborhood overall.
 
 #### Parameters
 
@@ -110,11 +112,11 @@ Computes the local total connectivity for each node in the graph. Total connecti
 
 | Return Type | Description |
 |-------------|-------------|
-| np.ndarray | An array containing the local total connectivity scores for each node |
+| np.ndarray | An array containing the total bottlenecking scores for each node |
 
 #### Mathematical Definition
 
-For a node i, the local p-total connectivity is defined as:
+For a node i, the total bottlenecking score at order p is defined as:
 
 $$\tau^{(p)}_i = \left(\sum_j \hat{A}^p_{ij}\right)^2$$
 
@@ -125,23 +127,23 @@ where $\hat{A}$ is the normalized adjacency matrix.
 ```python
 import torch
 import dgl
-from bridge.utils import local_total_connectivity
+from bridge.utils import total_bottlenecking_score
 
 # Load a dataset
 dataset = dgl.data.CoraGraphDataset()
 g = dataset[0]
 
-# Compute 2-hop local total connectivity for each node
-connectivity_scores = local_total_connectivity(p=2, g=g)
+# Compute 2-hop total bottlenecking score for each node
+connectivity_scores = total_bottlenecking_score(p=2, g=g)
 
-# Print average connectivity
-print(f"Average 2-hop connectivity: {connectivity_scores.mean():.4f}")
+# Print average total bottlenecking score
+print(f"Average 2-hop total bottlenecking score: {connectivity_scores.mean():.4f}")
 ```
 
-### local_homophily
+### class_bottlenecking_score
 
 ```python
-def local_homophily(
+def class_bottlenecking_score(
     p: int, 
     g: dgl.DGLGraph, 
     y: Optional[torch.Tensor] = None,
@@ -153,9 +155,9 @@ def local_homophily(
 ) -> torch.Tensor
 ```
 
-Computes the local p-homophily for each node in the graph. Local homophily measures how similar a node's features are to its p-hop neighbors with respect to class labels.
+Computes the local class-bottlenecking score for each node in the graph. This measures how strongly a node connects to same-class nodes within p hops.
 
-See full documentation: [local_homophily]({% link api-reference/local-homophily.md %})
+See full documentation: [class_bottlenecking_score]({% link api-reference/class-bottlenecking-score.md %})
 
 ## Utility Functions
 
@@ -253,11 +255,11 @@ Performs sparse-dense matrix multiplication.
 
 ## Relationship to Graph Neural Networks
 
-The homophily metrics provided in this module are particularly useful for:
+These metrics are particularly useful for:
 
-1. **Understanding GNN Performance**: Higher local homophily typically leads to better GNN performance for standard architectures.
+1. **Understanding GNN Performance**: Higher class-bottlenecking scores typically lead to better GNN performance for standard architectures.
 
-2. **Identifying Bottlenecks**: Nodes with low local homophily may act as bottlenecks for information flow.
+2. **Identifying Bottlenecks**: Nodes with low class-bottlenecking scores may act as bottlenecks for information flow.
 
 3. **Selecting Graph Rewiring Strategies**: The metrics can guide the selection of optimal permutation matrices for BRIDGE rewiring.
 
@@ -265,16 +267,16 @@ The homophily metrics provided in this module are particularly useful for:
 
 ## Usage in BRIDGE Pipeline
 
-In the BRIDGE rewiring pipeline, homophily metrics are used to:
+In the BRIDGE rewiring pipeline, these metrics are used to:
 
 1. Evaluate the quality of the original graph
-2. Guide the rewiring process to increase higher-order homophily
-3. Analyze the improvement in homophily after rewiring
+2. Guide the rewiring process to increase higher-order class connectivity
+3. Analyze the improvement in class-bottlenecking score after rewiring
 
 Example:
 
 ```python
-from bridge.utils import local_homophily
+from bridge.utils import class_bottlenecking_score
 from bridge.rewiring import run_bridge_pipeline
 
 # Run the BRIDGE pipeline
@@ -284,11 +286,11 @@ results = run_bridge_pipeline(
     # other parameters...
 )
 
-# Compare homophily before and after rewiring
-original_homophily = results['original_stats']['mean_local_homophily']
-rewired_homophily = results['rewired_stats']['mean_local_homophily']
+# Compare class-bottlenecking score before and after rewiring
+original_cb = results['original_stats']['mean_class_bottlenecking_score']
+rewired_cb = results['rewired_stats']['mean_class_bottlenecking_score']
 
-print(f"Original homophily: {original_homophily:.4f}")
-print(f"Rewired homophily: {rewired_homophily:.4f}")
-print(f"Improvement: {(rewired_homophily - original_homophily):.4f}")
+print(f"Original class-bottlenecking score: {original_cb:.4f}")
+print(f"Rewired class-bottlenecking score: {rewired_cb:.4f}")
+print(f"Improvement: {(rewired_cb - original_cb):.4f}")
 ```
