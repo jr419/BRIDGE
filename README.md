@@ -49,8 +49,15 @@ This repository contains two main packages:
 ```bash
 git clone https://github.com/jr419/BRIDGE.git
 cd bridge
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements-dev.txt  # pulls the same package set as the gnn conda env
 pip install -e .
+
+# If you need GPU wheels, install the appropriate torch/dgl variants before the -e step.
 ```
+
+The `requirements*.txt` files are pinned to the versions in the `gnn` conda environment so the test suite runs the same way without having to activate that environment.
 
 ## Quick Start
 

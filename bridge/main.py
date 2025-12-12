@@ -16,7 +16,7 @@ import pandas as pd
 from datetime import datetime
 from tqdm import tqdm
 import argparse
-from typing import List, Dict, Any
+from typing import List, Dict, Any, TypeVar, cast
 
 # Use absolute imports
 
@@ -26,6 +26,21 @@ from bridge.optimization import objective_mpnn, objective_rewiring, objective_it
 from bridge.datasets import SyntheticGraphDataset
 from bridge.sensitivity.run_experiment import run_full_sensitivity_experiment
 from bridge.rewiring import run_bridge_experiment, run_iterative_bridge_experiment
+
+T = TypeVar('T')
+
+
+def _pick_best(params: Dict[str, Any], attrs: Dict[str, Any], key: str, default: T) -> T:
+    """
+    Helper to pull a study result with a non-None fallback so downstream
+    calls receive concrete types instead of Optional[Any].
+    """
+    value = params.get(key, None)
+    if value is None:
+        value = attrs.get(key, None)
+    if value is None:
+        return default
+    return cast(T, value)
 
 
 def parse_args():
@@ -279,6 +294,8 @@ def run_rewiring_experiment(args):
     
     # Process each dataset
     for dataset in datasets:
+        # Capture a dataset name early so error handling has context even if loading fails
+        dataset_name = getattr(dataset, 'name', dataset.__class__.__name__)
         try:
             g = dataset[0]
             #add train val test masks 
@@ -477,40 +494,37 @@ def run_rewiring_experiment(args):
                 print("Best rewiring validation accuracy:", -rewiring_study.best_value)
                 
                 # Apply best rewiring strategy to the graph
-                matrix_idx = best_rewiring_params.get('matrix_idx', best_rewiring_attributes.get('matrix_idx'))
+                matrix_idx = int(_pick_best(best_rewiring_params, best_rewiring_attributes, 'matrix_idx', 0))
                 P_k = all_matrices[matrix_idx]
-                d_out = best_rewiring_params.get('d_out', best_rewiring_attributes.get('d_out'))
+                d_out_default = float(np.sqrt(g.number_of_nodes()))
+                d_out = float(_pick_best(best_rewiring_params, best_rewiring_attributes, 'd_out', d_out_default))
+
+                # Iterative rewiring specific parameters
+                n_rewire_iterations = None
+                if args.use_iterative_rewiring:
+                    n_rewire_default = args.n_rewire_iterations_range[-1] if args.n_rewire_iterations_range else 1
+                    n_rewire_iterations = int(
+                        _pick_best(best_rewiring_params, best_rewiring_attributes, 'n_rewire_iterations', n_rewire_default)
+                    )
                 
                 # Select MPNN hyperparameters
-                h_feats_mpnn = best_mpnn_params.get('h_feats', best_mpnn_attributes.get('h_feats'))#['h_feats']
-                n_layers_mpnn = best_mpnn_params.get('n_layers', best_mpnn_attributes.get('n_layers'))#['h_feats']
-                dropout_p_mpnn = best_mpnn_params.get('dropout_p', best_mpnn_attributes.get('dropout_p'))#['dropout_p']
-                model_lr_mpnn = best_mpnn_params.get('model_lr', best_mpnn_attributes.get('model_lr'))#['model_lr']
-                wd_mpnn = best_mpnn_params.get('weight_decay', best_mpnn_attributes.get('weight_decay'))#['weight_decay']
+                h_feats_mpnn = int(_pick_best(best_mpnn_params, best_mpnn_attributes, 'h_feats', args.mpnn_h_feats[0]))
+                n_layers_mpnn = int(_pick_best(best_mpnn_params, best_mpnn_attributes, 'n_layers', args.mpnn_n_layers[0]))
+                dropout_p_mpnn = float(_pick_best(best_mpnn_params, best_mpnn_attributes, 'dropout_p', args.mpnn_dropout_range[0]))
+                model_lr_mpnn = float(_pick_best(best_mpnn_params, best_mpnn_attributes, 'model_lr', args.lr_mpnn_range[0]))
+                wd_mpnn = float(_pick_best(best_mpnn_params, best_mpnn_attributes, 'weight_decay', args.wd_mpnn_range[0]))
                 
                 
+                sdrf_tau = float(_pick_best(best_rewiring_params, best_rewiring_attributes, 'sdrf_tau', args.sdrf_tau_range[0]))
+                sdrf_iterations = int(_pick_best(best_rewiring_params, best_rewiring_attributes, 'sdrf_iterations', args.sdrf_iterations_range[0]))
+                sdrf_c_plus = float(_pick_best(best_rewiring_params, best_rewiring_attributes, 'sdrf_c_plus', args.sdrf_c_plus_range[0]))
                 
-                if args.rewiring_method == 'sdrf':
-                    sdrf_tau = best_rewiring_params.get('sdrf_tau', best_rewiring_attributes.get('sdrf_tau'))
-                    sdrf_iterations = best_rewiring_params.get('sdrf_iterations', best_rewiring_attributes.get('sdrf_iterations'))
-                    sdrf_c_plus = best_rewiring_params.get('sdrf_c_plus', best_rewiring_attributes.get('sdrf_c_plus'))
-                else:
-                    sdrf_tau = None
-                    sdrf_iterations = None
-                    sdrf_c_plus = None
-                
-                if  args.rewiring_method == 'digl':
-                    # Extract DIGL parameters
-                    digl_alpha = best_rewiring_params.get('digl_alpha', best_rewiring_attributes.get('digl_alpha'))
-                    digl_k = best_rewiring_params.get('digl_k', best_rewiring_attributes.get('digl_k'))
-                    digl_t = best_rewiring_params.get('digl_t', best_rewiring_attributes.get('digl_t'))
-                    digl_epsilon = best_rewiring_params.get('digl_epsilon', best_rewiring_attributes.get('digl_epsilon'))
-                    digl_diffusion_type = best_rewiring_params.get('digl_diffusion_type', best_rewiring_attributes.get('digl_diffusion_type', 'ppr'))
-                else:
-                    digl_alpha = None
-                    digl_t = None
-                    digl_epsilon = None
-                    digl_diffusion_type = None
+                # Extract DIGL parameters (defaults are still concrete types when DIGL is not the chosen method)
+                digl_alpha = float(_pick_best(best_rewiring_params, best_rewiring_attributes, 'digl_alpha', args.digl_alpha_range[0]))
+                digl_k = int(_pick_best(best_rewiring_params, best_rewiring_attributes, 'digl_k', args.digl_k_options[0]))
+                digl_t = float(_pick_best(best_rewiring_params, best_rewiring_attributes, 'digl_t', args.digl_t_range[0]))
+                digl_epsilon = float(_pick_best(best_rewiring_params, best_rewiring_attributes, 'digl_epsilon', args.digl_epsilon_range[0]))
+                digl_diffusion_type = _pick_best(best_rewiring_params, best_rewiring_attributes, 'digl_diffusion_type', args.digl_diffusion_type)
 
                 
                 # Run final experiment with best parameters
