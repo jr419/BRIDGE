@@ -1,0 +1,45 @@
+seed: 0
+device: cpu
+results_dir: "results/sensitivity_smoke"
+
+sbm_params:
+  n_nodes: 20
+  mean_degree: 4
+  num_classes: 2
+  h_min: 0.4
+  h_max: 0.6
+  h_steps: 2
+
+feature_params:
+  dim: 5
+  sigma_intra: 1.0e-5
+  sigma_inter: 0.0
+  phi_global: 1.0e-5
+  psi_noise: 1.0e-5
+
+model_params:
+  hidden_feats: 8
+  n_epochs: 5
+  lr: 0.01
+  weight_decay: 0.0005
+  n_layers: 1
+  backbones:
+    - name: vanilla_gcn
+      type: vanilla_gcn
+    - name: initial_residual_gcn
+      type: initial_residual_gcn
+      alpha: 0.1
+    - name: gcnii
+      type: gcnii
+      alpha: 0.1
+      lambda: 0.5
+    - name: h2gcn
+      type: h2gcn
+
+experiment_params:
+  num_total_runs: 1
+  num_mc_simulations: 2
+  num_mc_inner_samples: 2
+  rho: 0.5
+
+single_graph: true

@@ -54,14 +54,20 @@ def estimate_snr_monte_carlo(
         for each node and output feature
     """
     model.eval().to(device)
+    graph = graph.to(device)
     
     num_nodes = labels.shape[0]
-    out_feats = labels.unique().shape[0]
+    try:
+        dtype = next(model.parameters()).dtype
+    except StopIteration:
+        dtype = torch.float32
+    with torch.no_grad():
+        out_feats = model(graph, torch.zeros(num_nodes, in_feats, device=device, dtype=dtype)).shape[1]
 
     # Allocate arrays for storing conditional means & variances
     # shape => [num_nodes, out_feats, num_montecarlo_simulations]
-    H_mean = torch.zeros(num_nodes, out_feats, num_montecarlo_simulations, device=device)
-    H_var = torch.zeros(num_nodes, out_feats, num_montecarlo_simulations, device=device)
+    H_mean = torch.zeros(num_nodes, out_feats, num_montecarlo_simulations, device=device, dtype=dtype)
+    H_var = torch.zeros(num_nodes, out_feats, num_montecarlo_simulations, device=device, dtype=dtype)
 
     # Generate features for all simulations at once
     feats_4d_feats = feature_generator(
@@ -72,6 +78,8 @@ def estimate_snr_monte_carlo(
         num_mu_samples=inner_samples,
         num_eps_gamma_samples=num_montecarlo_simulations,
     ).to(device)
+    if feats_4d_feats.dim() == 3:
+        feats_4d_feats = feats_4d_feats.unsqueeze(-1)
     
     for outer_idx in range(num_montecarlo_simulations):
         # Extract features for this simulation
@@ -83,7 +91,7 @@ def estimate_snr_monte_carlo(
 
         # Compute mean & var over inner_samples dimension (dim=2)
         H_cond_mean = H_3d.mean(dim=2)  # => [num_nodes, out_feats]
-        H_cond_var = H_3d.var(dim=2)   # => [num_nodes, out_feats]
+        H_cond_var = H_3d.var(dim=2, unbiased=False)   # => [num_nodes, out_feats]
 
         # Store the results
         H_mean[:, :, outer_idx] = H_cond_mean
@@ -92,7 +100,7 @@ def estimate_snr_monte_carlo(
     # Compute:
     # 1. Variance across mu samples for the means (numerator)
     # 2. Mean across mu samples for the variances (denominator)
-    var_across_mu = H_mean.var(dim=-1)
+    var_across_mu = H_mean.var(dim=-1, unbiased=False)
     mean_cond_var = H_var.mean(dim=-1)
     
     # Handle potential division by zero
@@ -165,6 +173,52 @@ def estimate_snr_theorem(
     return torch.mean(numerator / denominator, dim=1) #shape: [num_nodes, out_size]
 
 
+def estimate_snr_from_sensitivities(
+    signal_sensitivity: torch.Tensor,
+    noise_sensitivity: torch.Tensor,
+    global_sensitivity: torch.Tensor,
+    sigma_intra: torch.Tensor,
+    sigma_inter: torch.Tensor,
+    tau: torch.Tensor,
+    eta: torch.Tensor,
+    device: str = "cuda",
+) -> torch.Tensor:
+    """
+    Compute theorem SNR from precomputed signal/noise/global sensitivities.
+
+    Returns a tensor of shape [num_nodes], averaged across output features.
+    """
+    signal_sensitivity = signal_sensitivity.to(device)
+    noise_sensitivity = noise_sensitivity.to(device)
+    global_sensitivity = global_sensitivity.to(device)
+    sigma_intra = sigma_intra.to(device)
+    sigma_inter = sigma_inter.to(device)
+    tau = tau.to(device)
+    eta = eta.to(device)
+
+    num_nodes = signal_sensitivity.shape[0]
+    out_feats = signal_sensitivity.shape[1]
+    in_feats = signal_sensitivity.shape[-1]
+    dtype = signal_sensitivity.dtype
+
+    numerator = torch.zeros(num_nodes, out_feats, device=device, dtype=dtype)
+    denominator = torch.zeros(num_nodes, out_feats, device=device, dtype=dtype)
+
+    for q in range(in_feats):
+        for r in range(in_feats):
+            numerator += (
+                (sigma_intra[q, r] - sigma_inter[q, r]) * signal_sensitivity[:, :, q, r]
+                + sigma_inter[q, r] * global_sensitivity[:, :, q, r]
+            )
+            denominator += (
+                tau[q, r] * global_sensitivity[:, :, q, r]
+                + eta[q, r] * noise_sensitivity[:, :, q, r]
+            )
+
+    denominator[denominator < 1e-8] = 1e-8
+    return torch.mean(numerator / denominator, dim=1)
+
+
 def estimate_snr_theorem_autograd(
     model: nn.Module, 
     graph: dgl.DGLGraph, 
@@ -201,32 +255,14 @@ def estimate_snr_theorem_autograd(
     sigsen = estimate_sensitivity_autograd(model, graph, in_feats, labels, "signal", device)
     noisesen = estimate_sensitivity_autograd(model, graph, in_feats, labels, "noise", device)
     globsen = estimate_sensitivity_autograd(model, graph, in_feats, labels, "global", device)
-    
-    out_feats = labels.unique().shape[0]
-    
-    # Move covariance matrices to device
-    sigma_intra = sigma_intra.to(device)
-    sigma_inter = sigma_inter.to(device)
-    tau = tau.to(device)
-    eta = eta.to(device)
-    
-    # Compute numerator and denominator of the SNR formula
-    numerator = torch.zeros(graph.number_of_nodes(), out_feats, device=device)
-    denominator = torch.zeros(graph.number_of_nodes(), out_feats, device=device)
-    
-    for q in range(in_feats):
-        for r in range(in_feats):
-            numerator += (
-                (sigma_intra[q,r] - sigma_inter[q,r]) * sigsen[:,:,q,r]
-                + sigma_inter[q,r] * globsen[:,:,q,r]
-            )
-            denominator += (
-                tau[q,r] * globsen[:,:,q,r]
-                + eta[q,r] * noisesen[:,:,q,r]
-            )
-    
-    # Prevent division by zero
-    denominator[denominator < 1e-8] = 1e-8
-    
-    # Average SNR across output features
-    return torch.mean(numerator / denominator, dim=1)
+
+    return estimate_snr_from_sensitivities(
+        sigsen,
+        noisesen,
+        globsen,
+        sigma_intra,
+        sigma_inter,
+        tau,
+        eta,
+        device=device,
+    )

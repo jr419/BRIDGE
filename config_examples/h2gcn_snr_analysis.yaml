@@ -1,6 +1,6 @@
 seed: 42
 device: cuda # or cpu
-results_dir: "results/sensitivity_framework_validation_detailed"
+results_dir: "results/h2gcn_snr_analysis"
 
 sbm_params:
   n_nodes: 500
@@ -24,15 +24,8 @@ model_params:
   weight_decay: 0.0005
   n_layers: 2
   backbones:
-    - name: vanilla_gcn
-      type: vanilla_gcn
-    - name: initial_residual_gcn
-      type: initial_residual_gcn
-      alpha: 0.1
-    - name: gcnii
-      type: gcnii
-      alpha: 0.1
-      lambda: 0.5
+    - name: h2gcn
+      type: h2gcn
 
 experiment_params:
   num_total_runs: 100 # Per homophily value

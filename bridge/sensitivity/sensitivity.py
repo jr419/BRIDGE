@@ -12,6 +12,8 @@ import dgl
 from typing import Dict, Tuple, List, Union, Literal, Optional
 from torch.autograd.functional import jacobian
 
+from bridge.utils.graph_utils import dense_adjacency
+
 
 def estimate_sensitivity_analytic(
     model: nn.Module, 
@@ -46,7 +48,8 @@ def estimate_sensitivity_analytic(
     n = graph.number_of_nodes()
     
     # Prepare normalized adjacency
-    A = graph.adj().to_dense()
+    A = dense_adjacency(graph, device=W.device, dtype=W.dtype)
+    labels = labels.to(A.device)
     d_arr = A.sum(1)
     A[d_arr==0,:][:,d_arr==0] = torch.eye(n)[d_arr==0,:][:,d_arr==0]
     d_arr[d_arr==0] = 1
@@ -135,6 +138,11 @@ def compute_jacobian(
     x = x.to(device)
     graph = graph.to(device)
     model = model.to(device)
+    try:
+        model_dtype = next(model.parameters()).dtype
+        x = x.to(dtype=model_dtype)
+    except StopIteration:
+        pass
 
     # Define a 'forward function' that takes only the input tensor x
     # and returns the model output of shape (N, out_feats).
@@ -185,14 +193,19 @@ def estimate_sensitivity_autograd(
     """
     model.eval()
     N = graph.number_of_nodes()
-    out_feats = labels.unique().shape[0]
+    labels = labels.to(device)
+    try:
+        dtype = next(model.parameters()).dtype
+    except StopIteration:
+        dtype = torch.float32
     
     # Compute Jacobian at zero input
-    x = torch.zeros(N, in_feats, device=device)
+    x = torch.zeros(N, in_feats, device=device, dtype=dtype)
     jac = compute_jacobian(model, graph, x, device)  # shape: [N, out_feats, N, in_feats]
+    out_feats = jac.shape[1]
     
     # Initialize sensitivity matrix
-    sensitivity = torch.zeros(N, out_feats, in_feats, in_feats, device=device)
+    sensitivity = torch.zeros(N, out_feats, in_feats, in_feats, device=device, dtype=jac.dtype)
     
     # Compute different types of sensitivity
     if sensitivity_type == "signal":

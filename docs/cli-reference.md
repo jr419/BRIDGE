@@ -50,6 +50,12 @@ python -m bridge.main --experiment_type rewiring --standard_datasets cora \
 python -m bridge.main --experiment_type sensitivity --config config_examples/snr_analysis.yaml
 ```
 
+To run the SNR analysis with the H2GCN backbone:
+
+```bash
+python -m bridge.main --experiment_type sensitivity --config config_examples/h2gcn_snr_analysis.yaml
+```
+
 ## Configuration Options
 
 Run this to see all available options:

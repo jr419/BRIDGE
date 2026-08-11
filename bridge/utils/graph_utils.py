@@ -42,6 +42,23 @@ def check_symmetry(g: dgl.DGLGraph) -> bool:
     return torch.allclose(A, A.t(), atol=1e-8)
 
 
+def dense_adjacency(
+    g: dgl.DGLGraph,
+    device: Union[str, torch.device, None] = None,
+    dtype: torch.dtype = torch.float32,
+) -> torch.Tensor:
+    """Build a dense binary adjacency matrix without requiring DGL sparse."""
+    if device is None:
+        device = g.device
+    device = torch.device(device)
+    n = g.num_nodes()
+    A = torch.zeros((n, n), device=device, dtype=dtype)
+    src, dst = g.edges()
+    if src.numel() > 0:
+        A[src.to(device), dst.to(device)] = 1
+    return A
+
+
 def make_symmetric(g: dgl.DGLGraph, sym_type: str = 'both') -> dgl.DGLGraph:
     """
     Make a DGL graph symmetric by adding reverse edges.

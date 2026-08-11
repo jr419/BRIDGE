@@ -22,3 +22,19 @@ def test_models_exports():
     exported = set(getattr(mod, '__all__', []))
     # HPGraphConv/SGC were removed; only GCN remains public
     assert {'GCN'}.issubset(exported)
+
+
+def test_sensitivity_exports():
+    mod = import_module('bridge.sensitivity')
+    exported = set(getattr(mod, '__all__', []))
+    expected = {
+        'VanillaGCN',
+        'InitialResidualGCN',
+        'GCNII',
+        'H2GCN',
+        'create_sensitivity_model',
+        'create_fnn_baseline_model',
+        'normalize_backbone_type',
+        'estimate_snr_from_sensitivities',
+    }
+    assert expected.issubset(exported)

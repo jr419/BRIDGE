@@ -15,11 +15,13 @@ from scipy import stats # For statistical tests
 
 # Import from BRIDGE package
 from bridge.sensitivity import (
-    LinearGCN, FNN, TwoLayerFNN, TwoLayerGCN,
     create_feature_generator,
     estimate_snr_monte_carlo,
-    estimate_snr_theorem_autograd, # For GCN
+    estimate_snr_from_sensitivities,
     estimate_sensitivity_autograd, # For S, N, T
+    create_sensitivity_model,
+    create_fnn_baseline_model,
+    normalize_backbone_type,
     # New/modified utility functions will be imported from .utils
     # New visualization functions will be imported from .visualization
 )
@@ -86,11 +88,7 @@ def train_model_sensitivity(
     for epoch in range(n_epochs):
         # Training step
         optimizer.zero_grad()
-        # FNN models (both single and two-layer) don't use the graph argument
-        if isinstance(model, (FNN, TwoLayerFNN)):
-            logits = model(None, features)
-        else:
-            logits = model(graph, features)
+        logits = model(graph, features)
         loss = criterion(logits[train_mask], labels[train_mask])
         loss.backward()
         optimizer.step()
@@ -99,10 +97,7 @@ def train_model_sensitivity(
         if use_early_stopping:
             model.eval()
             with torch.no_grad():
-                if isinstance(model, (FNN, TwoLayerFNN)):
-                    val_logits = model(None, features)
-                else:
-                    val_logits = model(graph, features)
+                val_logits = model(graph, features)
                 val_loss = criterion(val_logits[val_mask], labels[val_mask]).item()
             
             # Check for improvement
@@ -144,10 +139,7 @@ def evaluate_node_CE(
     
     model.eval()
     with torch.no_grad():
-        if isinstance(model, FNN):
-            logits = model(None, features)
-        else:
-            logits = model(graph, features)
+        logits = model(graph, features)
         
         
         predictions_all = logits.argmax(dim=1)
@@ -183,6 +175,55 @@ def calculate_local_bottleneck_score(graph, p_order, labels, device):
         device=device
     )
     return bottleneck_scores
+
+
+def resolve_backbone_specs(model_params):
+    """Normalize configured backbone specs while preserving legacy n_layers configs."""
+    default_hidden = model_params.get('hidden_feats', 64)
+    default_layers = model_params.get('n_layers', 1)
+    default_alpha = model_params.get('alpha', 0.1)
+    default_lambda = model_params.get('lambda', model_params.get('lambda_', 0.5))
+    default_bias = model_params.get('bias', True)
+
+    raw_backbones = model_params.get('backbones')
+    if not raw_backbones:
+        raw_backbones = [{'name': 'vanilla_gcn', 'type': 'vanilla_gcn'}]
+
+    specs = []
+    for raw_spec in raw_backbones:
+        if isinstance(raw_spec, str):
+            raw_spec = {'name': raw_spec, 'type': raw_spec}
+
+        backbone_type = normalize_backbone_type(raw_spec.get('type', raw_spec.get('name', 'vanilla_gcn')))
+        name = raw_spec.get('name', backbone_type)
+        n_layers = raw_spec.get('n_layers', default_layers)
+        hidden_feats = raw_spec.get('hidden_feats', default_hidden)
+        alpha = raw_spec.get('alpha', default_alpha)
+        lambda_value = raw_spec.get('lambda', raw_spec.get('lambda_', default_lambda))
+        bias = raw_spec.get('bias', default_bias)
+
+        specs.append({
+            'name': name,
+            'type': backbone_type,
+            'n_layers': int(n_layers),
+            'hidden_feats': int(hidden_feats),
+            'alpha': float(alpha),
+            'lambda': float(lambda_value),
+            'bias': bool(bias),
+        })
+    return specs
+
+
+def backbone_result_fields(backbone_spec):
+    """Metadata columns written to node- and graph-level result rows."""
+    return {
+        'backbone': backbone_spec['name'],
+        'backbone_type': backbone_spec['type'],
+        'alpha': backbone_spec['alpha'] if backbone_spec['type'] in {'initial_residual_gcn', 'gcnii'} else None,
+        'lambda': backbone_spec['lambda'] if backbone_spec['type'] == 'gcnii' else None,
+        'n_layers': backbone_spec['n_layers'],
+        'hidden_feats': backbone_spec['hidden_feats'],
+    }
 
 
 def run_full_sensitivity_experiment(config_path):
@@ -233,11 +274,10 @@ def run_full_sensitivity_experiment(config_path):
 
     feature_generator = create_feature_generator(sigma_intra.cpu(), sigma_inter.cpu(), phi_cov.cpu(), psi_cov.cpu(), dtype=torch.double)
     
-    # For GCN, l=1 (single layer)
-    model_layers = config['model_params'].get('n_layers', 1)  # Default to 1 layer
-    
+    backbone_specs = resolve_backbone_specs(config['model_params'])
+
     print(f"DEBUG: Config loaded - n_layers: {config['model_params'].get('n_layers', 'NOT_FOUND')}")
-    print(f"DEBUG: Using {model_layers} layers for models")
+    print(f"DEBUG: Using backbones: {[spec['name'] for spec in backbone_specs]}")
     print(f"DEBUG: Single graph mode: {config.get('single_graph', False)}")
 
     node_results_list = []
@@ -303,141 +343,143 @@ def run_full_sensitivity_experiment(config_path):
                 labels = graph.ndata['label'].to(device)
 
             # Generate features (always new for each run)
-            features = feature_generator(n_nodes, in_feats, labels.cpu(), num_mu_samples=1)[:,:,0].to(device)
+            num_graph_nodes = graph.num_nodes()
+            features = feature_generator(num_graph_nodes, in_feats, labels.cpu(), num_mu_samples=1)[:,:,0].to(device)
             graph.ndata['feat'] = features
 
-            # 2. Initialize Models (GCN and FNN)
-            # Get model configuration parameters
-            hidden_feats = config['model_params'].get('hidden_feats', 64)
-            
-            # Select model based on number of layers
-            if model_layers == 1:
-                gcn_model = LinearGCN(in_feats, hidden_feats, num_classes).double().to(device)
-                fnn_model = FNN(in_feats, hidden_feats, num_classes).double().to(device)
-            elif model_layers == 2:
-                gcn_model = TwoLayerGCN(in_feats, hidden_feats, num_classes).double().to(device)
-                fnn_model = TwoLayerFNN(in_feats, hidden_feats, num_classes).double().to(device)
-            else:
-                raise ValueError(f"Unsupported number of layers: {model_layers}. Only 1 or 2 layers are supported.")
+            edgeless_graph = dgl.graph(([], []), num_nodes=num_graph_nodes).to(device)
+            edgeless_graph.ndata['label'] = labels
+            bottleneck_cache = {}
 
-            # print(f"DEBUG: Initialized models for run {run_idx} with homophily {h:.3f}")
-            # print(f"DEBUG: GCN model: {gcn_model}")
-            # print(f"DEBUG: FNN model: {fnn_model}")
+            for backbone_spec in backbone_specs:
+                result_fields = backbone_result_fields(backbone_spec)
 
-            # 3. Train Models
-            gcn_model = train_model_sensitivity(
-                gcn_model, graph, features, labels, 
-                graph.ndata['train_mask'], graph.ndata['val_mask'], 
-                n_epochs, lr, wd, device
-            )
-            fnn_model = train_model_sensitivity(
-                fnn_model, graph, features, labels, 
-                graph.ndata['train_mask'], graph.ndata['val_mask'], 
-                n_epochs, lr, wd, device
-            )
-            
-            # 4. Evaluate Models (Overall acc and Node-level correctness)
-            gcn_test_acc, gcn_test_loss, gcn_node_acc, gcn_node_ce = evaluate_node_CE(gcn_model, graph, features, labels, graph.ndata['test_mask'], device)
-            fnn_test_acc, fnn_test_loss, fnn_node_acc, fnn_node_ce = evaluate_node_CE(fnn_model, graph, features, labels, graph.ndata['test_mask'], device)
-            
-            # 5. Sensitivities & SNR for GCN
-            # Ensure models are in eval mode for Jacobian
-            gcn_model.eval()
-            
-            # Compute Jacobian at X=0 as per paper [cite: 93, 323]
-            zero_features = torch.zeros_like(features, device=device)
+                gcn_model = create_sensitivity_model(
+                    backbone_spec['type'],
+                    in_feats,
+                    backbone_spec['hidden_feats'],
+                    num_classes,
+                    n_layers=backbone_spec['n_layers'],
+                    alpha=backbone_spec['alpha'],
+                    lambda_=backbone_spec['lambda'],
+                    bias=backbone_spec['bias'],
+                ).double().to(device)
+                fnn_model = create_fnn_baseline_model(
+                    in_feats,
+                    backbone_spec['hidden_feats'],
+                    num_classes,
+                    n_layers=backbone_spec['n_layers'],
+                    bias=backbone_spec['bias'],
+                ).double().to(device)
 
-            S_sens_gcn = estimate_sensitivity_autograd(gcn_model, graph, in_feats, labels, "signal", device=device)
-            N_sens_gcn = estimate_sensitivity_autograd(gcn_model, graph, in_feats, labels, "noise", device=device)
-            T_sens_gcn = estimate_sensitivity_autograd(gcn_model, graph, in_feats, labels, "global", device=device)
+                gcn_model = train_model_sensitivity(
+                    gcn_model, graph, features, labels,
+                    graph.ndata['train_mask'], graph.ndata['val_mask'],
+                    n_epochs, lr, wd, device
+                )
+                fnn_model = train_model_sensitivity(
+                    fnn_model, edgeless_graph, features, labels,
+                    graph.ndata['train_mask'], graph.ndata['val_mask'],
+                    n_epochs, lr, wd, device
+                )
 
-            gcn_snr_theorem = estimate_snr_theorem_autograd(gcn_model, graph, in_feats, labels, sigma_intra, sigma_inter, phi_cov, psi_cov, device=device)
-            gcn_snr_mc = estimate_snr_monte_carlo(gcn_model, graph, in_feats, labels.cpu(), num_mc_simulations, feature_generator, device, num_mc_inner_samples)
-            
-            # Sensitivities for FNN (can be derived or computed if FNN is a GCN on edgeless graph)
-            # For a simple FNN, S=N=T, and they don't depend on graph structure.
-            # Let's compute them for completeness using the FNN model on a placeholder graph if needed.
-            # Or, use the property that for FFN, S=N=T. The Jacobian would be simpler.
-            # If FNN is nn.Linear, Jacobian is just the weights.
-            # For consistency, we can use estimate_sensitivity_autograd with an edgeless graph or adapt.
-            # The paper states for feedforward model S=N=T. [cite: 110]
-            # To get S_fnn, N_fnn, T_fnn using existing code, we can make an edgeless graph
-            edgeless_graph = dgl.graph(([], []), num_nodes=n_nodes).to(device)
-            edgeless_graph.ndata['label'] = labels # Keep labels for consistency if function expects it
-            
-            S_sens_fnn = estimate_sensitivity_autograd(fnn_model, edgeless_graph, in_feats, labels, "signal", device=device)
-            N_sens_fnn = estimate_sensitivity_autograd(fnn_model, edgeless_graph, in_feats, labels, "noise", device=device)
-            T_sens_fnn = estimate_sensitivity_autograd(fnn_model, edgeless_graph, in_feats, labels, "global", device=device)
+                gcn_test_acc, gcn_test_loss, gcn_node_acc, gcn_node_ce = evaluate_node_CE(
+                    gcn_model, graph, features, labels, graph.ndata['test_mask'], device
+                )
+                fnn_test_acc, fnn_test_loss, fnn_node_acc, fnn_node_ce = evaluate_node_CE(
+                    fnn_model, edgeless_graph, features, labels, graph.ndata['test_mask'], device
+                )
 
-            fnn_snr_theorem = estimate_snr_theorem_autograd(fnn_model, edgeless_graph, in_feats, labels, sigma_intra, sigma_inter, phi_cov, psi_cov, device=device)
-            fnn_snr_mc = estimate_snr_monte_carlo(fnn_model, edgeless_graph, in_feats, labels.cpu(), num_mc_simulations, feature_generator, device, num_mc_inner_samples)
+                gcn_model.eval()
+                S_sens_gcn = estimate_sensitivity_autograd(gcn_model, graph, in_feats, labels, "signal", device=device)
+                N_sens_gcn = estimate_sensitivity_autograd(gcn_model, graph, in_feats, labels, "noise", device=device)
+                T_sens_gcn = estimate_sensitivity_autograd(gcn_model, graph, in_feats, labels, "global", device=device)
 
-            # 6. Sensitivity Condition Check (for GCN)
-            sensitivity_condition_satisfied = calculate_sensitivity_condition_check(S_sens_gcn, N_sens_gcn, T_sens_gcn, rho) # Node-level [N, out_feats]
+                gcn_snr_theorem = estimate_snr_from_sensitivities(
+                    S_sens_gcn, N_sens_gcn, T_sens_gcn,
+                    sigma_intra, sigma_inter, phi_cov, psi_cov,
+                    device=device
+                )
+                gcn_snr_mc = estimate_snr_monte_carlo(
+                    gcn_model, graph, in_feats, labels.cpu(),
+                    num_mc_simulations, feature_generator, device, num_mc_inner_samples
+                )
 
-            # 7. Within-class Bottlenecking Score (for GCN graph) h_i^{l,l} [cite: 144]
-            # The paper uses l for layer index, and also for path length in h_i^{s,t}.
-            # For an L-layer GCN, the relevant path length for sensitivity is often L.
-            local_bottleneck_scores = calculate_local_bottleneck_score(graph, model_layers, labels, device) # Node-level [N]
+                S_sens_fnn = estimate_sensitivity_autograd(fnn_model, edgeless_graph, in_feats, labels, "signal", device=device)
+                N_sens_fnn = estimate_sensitivity_autograd(fnn_model, edgeless_graph, in_feats, labels, "noise", device=device)
+                T_sens_fnn = estimate_sensitivity_autograd(fnn_model, edgeless_graph, in_feats, labels, "global", device=device)
 
-            # 8. Graph-level Bottlenecking Score (for GCN graph) h_i^{l,l} 
-            graph_level_ho_homophily = local_bottleneck_scores.mean()
-            # Store all metrics
-            # Node-level data
-            for node_idx in range(n_nodes):
-                node_data = {
+                fnn_snr_theorem = estimate_snr_from_sensitivities(
+                    S_sens_fnn, N_sens_fnn, T_sens_fnn,
+                    sigma_intra, sigma_inter, phi_cov, psi_cov,
+                    device=device
+                )
+                fnn_snr_mc = estimate_snr_monte_carlo(
+                    fnn_model, edgeless_graph, in_feats, labels.cpu(),
+                    num_mc_simulations, feature_generator, device, num_mc_inner_samples
+                )
+
+                sensitivity_condition_satisfied = calculate_sensitivity_condition_check(
+                    S_sens_gcn, N_sens_gcn, T_sens_gcn, rho
+                )
+
+                p_order = backbone_spec['n_layers']
+                if p_order not in bottleneck_cache:
+                    bottleneck_cache[p_order] = calculate_local_bottleneck_score(graph, p_order, labels, device)
+                local_bottleneck_scores = bottleneck_cache[p_order]
+                graph_level_ho_homophily = local_bottleneck_scores.mean()
+
+                for node_idx in range(num_graph_nodes):
+                    node_data = {
+                        **result_fields,
+                        'homophily_h': h,
+                        'run_idx': run_idx,
+                        'node_idx': node_idx,
+                        'label': labels[node_idx].item(),
+                        'degree': graph.in_degrees()[node_idx].item(),
+                        'is_graph_level': False,
+                        'single_graph_mode': single_graph_mode,
+                        'gcn_S_sensitivity_trace': torch.diagonal(S_sens_gcn[node_idx], dim1=-2, dim2=-1).sum().item(),
+                        'gcn_N_sensitivity_trace': torch.diagonal(N_sens_gcn[node_idx], dim1=-2, dim2=-1).sum().item(),
+                        'gcn_T_sensitivity_trace': torch.diagonal(T_sens_gcn[node_idx], dim1=-2, dim2=-1).sum().item(),
+                        'gcn_sensitivity_condition_met': sensitivity_condition_satisfied[node_idx].any().item(),
+                        'gcn_snr_theorem_node': gcn_snr_theorem[node_idx].mean().item(),
+                        'gcn_snr_mc_node': gcn_snr_mc[node_idx].mean().item(),
+                        'fnn_snr_theorem_node': fnn_snr_theorem[node_idx].mean().item(),
+                        'fnn_snr_mc_node': fnn_snr_mc[node_idx].mean().item(),
+                        'gcn_ce_node': gcn_node_ce[node_idx].item(),
+                        'fnn_ce_node': fnn_node_ce[node_idx].item(),
+                        'gcn_accuracy_node': gcn_node_acc[node_idx].item(),
+                        'fnn_accuracy_node': fnn_node_acc[node_idx].item(),
+                        'gcn_bottleneck_score_node': local_bottleneck_scores[node_idx].item(),
+                    }
+                    node_results_list.append(node_data)
+
+                graph_data_entry = {
+                    **result_fields,
                     'homophily_h': h,
                     'run_idx': run_idx,
-                    'node_idx': node_idx,
-                    'label': labels[node_idx].item(),
-                    'degree': graph.in_degrees()[node_idx].item(),
-                    'is_graph_level': False, # Node-level data
-                    'single_graph_mode': single_graph_mode,  # Track experiment mode
-                    'gcn_S_sensitivity_trace': torch.diagonal(S_sens_gcn[node_idx], dim1=-2, dim2=-1).sum().item(), # sum over out_feats and in_feats
-                    'gcn_N_sensitivity_trace': torch.diagonal(N_sens_gcn[node_idx], dim1=-2, dim2=-1).sum().item(),
-                    'gcn_T_sensitivity_trace': torch.diagonal(T_sens_gcn[node_idx], dim1=-2, dim2=-1).sum().item(),
-                    
-                    # Taking mean over output features for condition check, or first output feature
-                    'gcn_sensitivity_condition_met': sensitivity_condition_satisfied[node_idx].any().item(), # If met for any output feature
-                    'gcn_snr_theorem_node': gcn_snr_theorem[node_idx].mean().item(), # Avg over out_feats
-                    'gcn_snr_mc_node': gcn_snr_mc[node_idx].mean().item(), # Avg over out_feats
-                    'fnn_snr_theorem_node': fnn_snr_theorem[node_idx].mean().item(),
-                    'fnn_snr_mc_node': fnn_snr_mc[node_idx].mean().item(),
-                    
-                    
-                    'gcn_ce_node': gcn_node_ce[node_idx].item(),
-                    'fnn_ce_node': fnn_node_ce[node_idx].item(),
-                    
-                    'gcn_accuracy_node': gcn_node_acc[node_idx].item(),
-                    'fnn_accuracy_node': fnn_node_acc[node_idx].item(),
-                    'gcn_bottleneck_score_node': local_bottleneck_scores[node_idx].item(),
+                    'is_graph_level': True,
+                    'single_graph_mode': single_graph_mode,
+                    'gcn_avg_S_sensitivity': torch.diagonal(S_sens_gcn, dim1=-2, dim2=-1).sum(dim=(-1,-2)).mean().item(),
+                    'gcn_avg_N_sensitivity': torch.diagonal(N_sens_gcn, dim1=-2, dim2=-1).sum(dim=(-1,-2)).mean().item(),
+                    'gcn_avg_T_sensitivity': torch.diagonal(T_sens_gcn, dim1=-2, dim2=-1).sum(dim=(-1,-2)).mean().item(),
+                    'gcn_avg_snr_theorem': gcn_snr_theorem.mean().item(),
+                    'gcn_avg_snr_mc': gcn_snr_mc.mean().item(),
+                    'fnn_avg_snr_theorem': fnn_snr_theorem.mean().item(),
+                    'fnn_avg_snr_mc': fnn_snr_mc.mean().item(),
+                    'gcn_test_loss_graph': gcn_test_loss,
+                    'fnn_test_loss_graph': fnn_test_loss,
+                    'gcn_test_accuracy_graph': gcn_test_acc,
+                    'fnn_test_accuracy_graph': fnn_test_acc,
+                    'gcn_higher_order_homophily_graph': graph_level_ho_homophily.item()
                 }
-                node_results_list.append(node_data)
-            
-            # Graph-level data (can be one entry per run_idx and h)
-            graph_data_entry = {
-                'homophily_h': h,
-                'run_idx': run_idx,
-                'is_graph_level': True,
-                'single_graph_mode': single_graph_mode,  # Track experiment mode
-                'gcn_avg_S_sensitivity': torch.diagonal(S_sens_gcn, dim1=-2, dim2=-1).sum(dim=(-1,-2)).mean().item(),
-                'gcn_avg_N_sensitivity': torch.diagonal(N_sens_gcn, dim1=-2, dim2=-1).sum(dim=(-1,-2)).mean().item(),
-                'gcn_avg_T_sensitivity': torch.diagonal(T_sens_gcn, dim1=-2, dim2=-1).sum(dim=(-1,-2)).mean().item(),
-                'gcn_avg_snr_theorem': gcn_snr_theorem.mean().item(),
-                'gcn_avg_snr_mc': gcn_snr_mc.mean().item(),
-                'fnn_avg_snr_theorem': fnn_snr_theorem.mean().item(),
-                'fnn_avg_snr_mc': fnn_snr_mc.mean().item(),
-                'gcn_test_loss_graph': gcn_test_loss,
-                'fnn_test_loss_graph': fnn_test_loss,
-                'gcn_test_accuracy_graph': gcn_test_acc,
-                'fnn_test_accuracy_graph': fnn_test_acc,
-                'gcn_higher_order_homophily_graph': graph_level_ho_homophily.item()
-            }
-            graph_results_list.append(graph_data_entry)
+                graph_results_list.append(graph_data_entry)
 
     #save as json
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    results_dir = Path("results") / timestamp
+    results_base = Path(config.get('results_dir', 'results'))
+    results_dir = results_base / timestamp
     results_dir.mkdir(parents=True, exist_ok=True)
     
     # Save stored graphs if in single_graph mode
@@ -481,29 +523,26 @@ def run_full_sensitivity_experiment(config_path):
     with open(results_dir / f"graph_results_{timestamp}.json", 'w') as f:
         json.dump(graph_results_json, f, indent=4)
     
-    # Create instances of visualization functions from bridge.sensitivity.visualization
-    # This requires the visualization functions to be defined or imported.
-    # For example:
-    from .visualization import (plot_local_sensitivity_validation,
-                                plot_snr_ratio_analysis, plot_bottlenecking_snr_scatter, 
-                                plot_graph_wide_snr_validation, plot_node_acc_analysis
+    from .paper_plots import generate_paper_sensitivity_plots_from_frames
+
+    generated_plots = generate_paper_sensitivity_plots_from_frames(
+        node_df,
+        graph_df,
+        results_dir / "paper_plots",
+        results_dir=results_dir,
+        primary_backbone=backbone_specs[0]['name'],
+        h_value=0.5,
+        mean_degree=mean_degree,
     )
-    # Placeholder for actual plot generation
-    plot_local_sensitivity_validation(node_df, results_dir / f"plot1_local_sensitivity_validation_{timestamp}.png")
-    plot_snr_ratio_analysis(node_df, results_dir / f"plot2_snr_ratio_analysis_{timestamp}.png")
-    plot_node_acc_analysis(node_df, results_dir / f"plot2_node_acc_analysis_{timestamp}.png")
-    plot_bottlenecking_snr_scatter(node_df, results_dir / f"plot3_bottlenecking_snr_scatter_{timestamp}.png")
-    
-    # Modify plot_snr_vs_homophily from existing utils if needed, or create new plot_graph_wide_snr_validation
-    plot_graph_wide_snr_validation(graph_df, results_dir / f"plot4_graph_wide_snr_{timestamp}.png")
     
     # plot_snr_accuracy_correlation(graph_df, results_dir / f"plot5_snr_accuracy_correlation_{timestamp}.png")
     
     print(f"Experiment results saved to {results_dir}")
+    print(f"Generated {len(generated_plots)} paper-style plots in {results_dir / 'paper_plots'}")
     if single_graph_mode:
         print(f"Generated graphs saved to {results_dir / 'graphs'}")
     
-    return df_results
+    return results_dir
 
 if __name__ == "__main__":
     # This would be run with: python -m bridge.sensitivity.run_experiment --config path_to_your_config.yaml
