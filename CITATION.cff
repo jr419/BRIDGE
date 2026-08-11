@@ -1,0 +1,35 @@
+cff-version: 1.2.0
+message: "If you use BRIDGE in your research, please cite the software and the associated paper."
+title: "BRIDGE: Block Rewiring from Inference-Derived Graph Ensembles"
+type: software
+version: "1.1.0"
+license: MIT
+repository-code: "https://github.com/jr419/BRIDGE"
+abstract: "BRIDGE is a graph rewiring framework that uses stochastic block models to create graph structures for improved node classification and includes sensitivity and signal-to-noise ratio analysis tools."
+keywords:
+  - graph neural networks
+  - graph rewiring
+  - message passing neural networks
+  - signal-to-noise ratio
+  - sensitivity analysis
+  - homophily
+authors:
+  - family-names: Rubin
+    given-names: Jonathan
+  - family-names: Loomba
+    given-names: Sahil
+  - family-names: Jones
+    given-names: "Nick S."
+preferred-citation:
+  type: article
+  title: "Limits of message passing for node classification: How class-bottlenecks restrict signal-to-noise ratio"
+  year: 2025
+  doi: "10.48550/arXiv.2508.17822"
+  url: "https://arxiv.org/abs/2508.17822"
+  authors:
+    - family-names: Rubin
+      given-names: Jonathan
+    - family-names: Loomba
+      given-names: Sahil
+    - family-names: Jones
+      given-names: "Nick S."
