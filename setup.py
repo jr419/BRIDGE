@@ -15,13 +15,12 @@ with open("README.md", encoding="utf-8") as f:
 
 setup(
     name="bridge",
-    version="1.0.0",
+    version="1.1.0",
     description="BRIDGE: Block Rewiring from Inference-Derived Graph Ensembles",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    author="YOUR NAME",
-    author_email="YOUR.EMAIL@example.com",
-    url="https://github.com/YOUR-USERNAME/bridge",
+    author="Jonathan Rubin, Sahil Loomba, Nick S. Jones",
+    url="https://github.com/jr419/BRIDGE",
     packages=find_packages(),
     python_requires=">=3.7",
     entry_points={
